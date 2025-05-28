@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>매칭안된 여권 목록</h2>
+    <div class="card mt-4">
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>여권 이름</th>
+                        <th>여권번호</th>
+                        <th>생년월일</th>
+                        <th>작업</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for passport in unmatched_passports %}
+                    <tr>
+                        <td>{{ passport.passport_name }}</td>
+                        <td>{{ passport.passport_number or '없음' }}</td>
+                        <td>{{ passport.birthday or '없음' }}</td>
+                        <td>
+                            <a href="{{ url_for('edit_passport', name=passport.passport_name) }}" class="btn btn-warning btn-sm">
+                                수정
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %} 
