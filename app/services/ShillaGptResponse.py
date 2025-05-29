@@ -1,8 +1,8 @@
 import openai
 import os
 
-def classificationUseGpt(ocr_text: str) -> str:
-    SYSTEM_PROMPT = open("/Users/gimdonghun/Documents/DbTest/newPrompt.txt", "r").read()
+def ShillaClassificationUseGpt(ocr_text: str) -> str:
+    SYSTEM_PROMPT = open("/Users/gimdonghun/Documents/DbTest/ShillaPrompt.txt", "r").read()
     openai.api_key = os.getenv("OPENAI_API_KEY_COMPANY") 
     response = openai.ChatCompletion.create(
         model="gpt-4.1-mini",

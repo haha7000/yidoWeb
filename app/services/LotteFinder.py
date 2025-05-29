@@ -1,4 +1,4 @@
-from app.services.gptResponse import classificationUseGpt
+from app.services.LotteGptResponse import LotteClassificationUseGpt
 from app.services.ocr_module import VisionOcr
 from app.models.models import Receipt, Passport, UnrecognizedImage
 from app.core.database import SessionLocal
@@ -9,7 +9,7 @@ def LotteAiOcr(imagePath, user_id):
     try:
         # OCR 및 GPT 처리
         ocrResult = VisionOcr(imagePath)
-        result = classificationUseGpt(ocrResult)
+        result = LotteClassificationUseGpt(ocrResult)
 
         # JSON 문자열을 파싱
         parsed_result = json.loads(result)

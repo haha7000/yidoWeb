@@ -5,25 +5,42 @@ Document Type Identification!
 
 
 RECEIPT_PROMPT = """
-    Please convert the receipt OCR results into the JSON format below. Include only the specified keys, and do not include any keys other than those mentioned.
+    Please convert the SHILLA duty-free receipt OCR results into the JSON format below.  
+    Include **only** the specified keys, and do not include any keys other than those mentioned.
+
+    ---
 
     The conditions for each field are as follows:
 
-    - "receiptNumber": The receipt number consists of numbers only and should be entered without spaces or hyphens. 
-      For **LOTTE**, the receipt number must be **exactly 14 digits**. 
-      If you cannot find exactly 14 digits, return an empty string ("").
-      This number is located **below** `www.lottedfs.com` or `kr.lottedfs.com` and **above** `SaleDT` and `SysDT`. 
-      For example, it follows a format like `902087-24-000593`, which consists of 6 digits-2 digits-6 digits. 
-      For **SHILLA**, the receipt number is a total of **13 digits**.
+    - "receiptNumber": The receipt number consists of numbers only and must be exactly **13 digits**.  
+    It is typically located below a barcode or near labels such as "NO." or "Receipt No.".  
+    The number may appear in a segmented format like `01-245-077-0063-1`, which should be cleaned and joined into `0124507700631`.  
+    If the cleaned result is not exactly 13 digits, return an empty string `""`.
 
-      “Since a single image may contain multiple receipts, please extract all receipt numbers.”
-    
-    
+    - "passportNumber": The passport number must be **exactly 9 characters** long.  
+    It should begin with **1–2 uppercase English letters**, followed by **numbers**.  
+    If the OCR mistakenly detects a lowercase "l" or uppercase "I", interpret it as the digit **1**.  
+    If the format is invalid or cannot be found, return an empty string `""`.
 
-    The output should only include the following keys:
+    ---
+
+    Note:
+    - A single image may contain multiple receipts, and each may include a separate passport number.
+    - Please extract all valid entries from the image.
+
+    ---
+
+    Output format:
+    [
     {
-        "receiptNumber": "90208724000593", "92208724004591"
+        "receiptNumber": "0124507700631",
+        "passportNumber": "MZ9268755"
+    },
+    {
+        "receiptNumber": "0124507700684",
+        "passportNumber": ""
     }
+    ]
     """
 
 
