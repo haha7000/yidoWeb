@@ -1,439 +1,494 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>영수증 OCR - 처리 결과</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <style>
-    body {
-    font-family: 'Roboto', sans-serif;
-    background-color: #f8f9fa;
-}
+{% extends "base.html" %}
 
-/* 공통: 박스 스타일 */
-.container {
-    margin-top: 20px;
-}
-/* result.html 전용 스타일 */
-.navbar {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-.accordion-item {
-    border: none;
-    border-radius: 8px;
-    margin-bottom: 10px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-.accordion-button {
-    font-weight: 500;
-    background-color: #ffffff;
-}
-.table th {
-    background-color: #007bff;
-    color: white;
-}
-.table .matched {
-    color: #28a745;
-    font-weight: 500;
-}
-.table .unmatched {
-    color: #dc3545;
-    font-weight: 500;
-}
-.search-box {
-    max-width: 400px;
-    margin: 20px 0;
-}
-.btn-next {
-    background-color: #28a745;
-    border: none;
-    padding: 10px 20px;
-    font-weight: 500;
-}
-.btn-next:hover {
-    background-color: #218838;
-}
-.unmatched-list .list-group-item {
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
-.unmatched-list .list-group-item:hover {
-    background-color: #e9ecef;
-}
-    </style>
-</head>
-<body>
-
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
-    <div class="container">
-        <a class="navbar-brand" href="/result/">OCR 처리 시스템</a>
-        <div class="navbar-nav ms-auto">
-            <a class="nav-link" href="/">새로운 처리</a>
-        </div>
-    </div>
-</nav>
-
+{% block content %}
 <div class="container my-5">
     <h1 class="text-center mb-4">OCR 처리 결과</h1>
+    
     {% if error %}
     <div class="alert alert-danger" role="alert">
+        <i class="fas fa-exclamation-triangle"></i>
         {{ error }}
     </div>
     {% endif %}
-    <div class="search-box">
-        <input type="text" id="searchInput" class="form-control" placeholder="고객 이름 또는 영수증 번호 검색...">
-    </div>
     
-    <div class="mb-4 text-center">
-        <a href="/generate-receipts/" class="btn btn-primary">수령증 다운로드</a>
-        <a href="/unmatched-passports/" class="btn btn-warning">매칭안된 여권</a>
-    </div>
-    
-    <div class="row">
-        <div class="col-md-6">
-            <h3 class="mb-4">매칭된 영수증 번호</h3>
-            <div class="accordion" id="customerAccordion">
-                {% for customer in results %}
-                <div class="accordion-item">
-                    <h2 class="accordion-header">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#customer{{ loop.index }}">
-                            {{ customer.name }}
-                            {% if customer.needs_update %}
-                            <span class="badge bg-warning text-dark ms-2">
-                                <i class="fas fa-exclamation-triangle"></i> 여권 수정 필요
-                            </span>
-                            {% endif %}
-                        </button>
-                    </h2>
-                    <div id="customer{{ loop.index }}" class="accordion-collapse collapse">
-                        <div class="accordion-body">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>영수증 번호</th>
-                                        <th>여권번호</th>
-                                        <th>생년월일</th>
-                                        <th>상태</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for receipt_number in customer.receipt_numbers %}
-                                    <tr>
-                                        <td>{{ receipt_number }}</td>
-                                        <td>{{ customer.passport_number or '없음' }}</td>
-                                        <td>{{ customer.birthday or '없음' }}</td>
-                                        <td>
-                                            {% if customer.needs_update %}
-                                            <a href="{{ url_for('edit_passport', name=customer.name) }}" class="btn btn-warning btn-sm">
-                                                수정
-                                            </a>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+    <!-- 처리 통계 (상단으로 이동) -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 col-md-3 mb-3 mb-md-0">
+                            <div class="stat-item">
+                                <div class="stat-number text-success">{{ results|length }}</div>
+                                <div class="stat-label">매칭된 고객</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3 mb-md-0">
+                            <div class="stat-item">
+                                {% set total_receipts = 0 %}
+                                {% for customer in results %}
+                                    {% set total_receipts = total_receipts + customer.receipt_numbers|length %}
+                                {% endfor %}
+                                <div class="stat-number text-primary">{{ total_receipts }}</div>
+                                <div class="stat-label">매칭된 영수증</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3 mb-md-0">
+                            <div class="stat-item">
+                                <div class="stat-number text-warning">{{ unmatched_receipts|length }}</div>
+                                <div class="stat-label">미매칭 영수증</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="stat-item">
+                                <div class="stat-number text-info">{{ total_receipts + unmatched_receipts|length }}</div>
+                                <div class="stat-label">전체 영수증</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 진행률 바 추가 -->
+                    <div class="mt-4">
+                        {% set completion_rate = ((total_receipts / (total_receipts + unmatched_receipts|length)) * 100) if (total_receipts + unmatched_receipts|length) > 0 else 0 %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold">처리 진행률</span>
+                            <span class="badge bg-primary">{{ "%.1f"|format(completion_rate) }}%</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-gradient" role="progressbar" 
+                                 style="width: {{ completion_rate }}%"
+                                 aria-valuenow="{{ completion_rate }}" aria-valuemin="0" aria-valuemax="100">
+                            </div>
                         </div>
                     </div>
                 </div>
-                {% endfor %}
             </div>
         </div>
-        <div class="col-md-6 unmatched-list">
-            <h3 class="mb-4">매칭되지 않은 영수증 번호</h3>
-            <div class="list-group">
-                {% for receipt in unmatched_receipts %}
-                <div class="list-group-item">
-                    <a href="/edit_unmatched/{{ receipt.id }}" class="text-decoration-none">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>영수증 번호:</strong> {{ receipt.receipt_number }}
-                                <br>
-                                <small class="text-muted">파일: {{ receipt.file_name }}</small>
-                            </div>
-                            <i class="fas fa-chevron-right"></i>
-                        </div>
+    </div>
+    
+    <!-- 액션 버튼들 -->
+    <div class="mb-4">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <div class="d-grid">
+                    <a href="/generate-receipts/" class="btn btn-success btn-lg" id="downloadBtn">
+                        <i class="fas fa-download me-2"></i>수령증 다운로드
                     </a>
                 </div>
-                {% endfor %}
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="d-grid">
+                    <a href="/unmatched-passports/" class="btn btn-warning btn-lg">
+                        <i class="fas fa-passport me-2"></i>매칭안된 여권
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="d-grid">
+                    <a href="/upload/" class="btn btn-outline-primary btn-lg">
+                        <i class="fas fa-upload me-2"></i>새로운 처리
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 검색 박스 -->
+    <div class="search-box">
+        <div class="input-group input-group-lg">
+            <span class="input-group-text">
+                <i class="fas fa-search"></i>
+            </span>
+            <input type="text" id="searchInput" class="form-control" 
+                   placeholder="고객 이름 또는 영수증 번호 검색...">
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- 매칭된 영수증 -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-check-circle"></i> 매칭된 영수증
+                        <span class="badge bg-light text-success ms-2">{{ results|length }}명</span>
+                    </h4>
+                </div>
+                <div class="card-body p-0">
+                    {% if results %}
+                    <div class="accordion" id="customerAccordion">
+                        {% for customer in results %}
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" 
+                                        data-bs-toggle="collapse" data-bs-target="#customer{{ loop.index }}"
+                                        aria-expanded="false" aria-controls="customer{{ loop.index }}">
+                                    <i class="fas fa-user me-2"></i>
+                                    {{ customer.name }}
+                                    <span class="badge bg-primary ms-2">{{ customer.receipt_numbers|length }}건</span>
+                                    {% if customer.needs_update %}
+                                    <span class="badge bg-warning text-dark ms-2">
+                                        <i class="fas fa-exclamation-triangle"></i> 여권 수정 필요
+                                    </span>
+                                    {% endif %}
+                                </button>
+                            </h2>
+                            <div id="customer{{ loop.index }}" class="accordion-collapse collapse"
+                                 data-bs-parent="#customerAccordion">
+                                <div class="accordion-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th><i class="fas fa-receipt"></i> 영수증 번호</th>
+                                                    <th><i class="fas fa-id-card"></i> 여권번호</th>
+                                                    <th><i class="fas fa-calendar"></i> 생년월일</th>
+                                                    <th><i class="fas fa-cog"></i> 작업</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for receipt_number in customer.receipt_numbers %}
+                                                <tr>
+                                                    <td><code>{{ receipt_number }}</code></td>
+                                                    <td>{{ customer.passport_number or '<small class="text-muted">없음</small>' | safe }}</td>
+                                                    <td>{{ customer.birthday or '<small class="text-muted">없음</small>' | safe }}</td>
+                                                    <td>
+                                                        {% if customer.needs_update %}
+                                                        <a href="/edit_passport/{{ customer.name }}" 
+                                                           class="btn btn-warning btn-sm">
+                                                            <i class="fas fa-edit"></i> 수정
+                                                        </a>
+                                                        {% else %}
+                                                        <span class="badge bg-success">
+                                                            <i class="fas fa-check"></i> 완료
+                                                        </span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center p-5 text-muted">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <h5>매칭된 영수증이 없습니다</h5>
+                        <p>영수증을 업로드하거나 매칭되지 않은 영수증을 수정해보세요.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 매칭되지 않은 영수증 -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> 매칭되지 않은 영수증
+                        <span class="badge bg-light text-warning ms-2">{{ unmatched_receipts|length }}건</span>
+                    </h4>
+                </div>
+                <div class="card-body p-0">
+                    {% if unmatched_receipts %}
+                    <div class="unmatched-list">
+                        {% for receipt in unmatched_receipts %}
+                        <div class="list-group-item list-group-item-action border-0">
+                            <a href="/edit_unmatched/{{ receipt.id }}" class="text-decoration-none text-dark">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold text-primary">
+                                            <i class="fas fa-receipt me-1"></i>
+                                            영수증 번호: <code>{{ receipt.receipt_number or '인식 실패' }}</code>
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="fas fa-file-image me-1"></i>
+                                            파일: {{ receipt.file_path.split('/')[-1] if receipt.file_path else '알 수 없음' }}
+                                        </small>
+                                    </div>
+                                    <div>
+                                        <i class="fas fa-chevron-right text-muted"></i>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center p-5 text-muted">
+                        <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
+                        <h5>모든 영수증이 매칭되었습니다!</h5>
+                        <p>매칭되지 않은 영수증이 없습니다.</p>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 </div>
 
+<style>
+/* result.html 전용 스타일 */
+.search-box {
+    max-width: 600px;
+    margin: 0 auto 30px auto;
+}
+
+/* 통계 카드 스타일 */
+.stat-item {
+    padding: 10px;
+    border-radius: 8px;
+    transition: transform 0.2s ease;
+}
+
+.stat-item:hover {
+    transform: translateY(-2px);
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.progress {
+    border-radius: 10px;
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    border-radius: 10px;
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    transition: width 0.8s ease;
+}
+
+/* 액션 버튼 스타일 개선 */
+.btn-lg {
+    padding: 12px 20px;
+    font-weight: 500;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-lg:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.accordion-item {
+    border: none;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.accordion-button {
+    font-weight: 500;
+    background-color: #ffffff;
+    border: none;
+    padding: 15px 20px;
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: #f8f9fa;
+    color: #0c63e4;
+}
+
+.accordion-button:focus {
+    box-shadow: none;
+    border: none;
+}
+
+.table th {
+    background-color: #007bff;
+    color: white;
+    font-weight: 500;
+    font-size: 0.9em;
+}
+
+.table td {
+    vertical-align: middle;
+    font-size: 0.9em;
+}
+
+.list-group-item {
+    border: none;
+    border-bottom: 1px solid #eee;
+    padding: 15px 20px;
+    transition: all 0.2s;
+}
+
+.list-group-item:hover {
+    background-color: #f8f9fa;
+    transform: translateX(5px);
+}
+
+.list-group-item:last-child {
+    border-bottom: none;
+}
+
+.card-header h4, .card-header h5 {
+    font-weight: 500;
+}
+
+.badge {
+    font-size: 0.75em;
+}
+
+code {
+    background-color: #f8f9fa;
+    color: #e83e8c;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+/* 로딩 상태 스타일 */
+.btn.loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.btn.loading::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid transparent;
+    border-top: 2px solid #ffffff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+
 <script>
-let scale = 1;
-let image = document.getElementById('receipt-image');
+document.addEventListener('DOMContentLoaded', function() {
+    // 검색 기능
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const searchValue = this.value.toLowerCase();
+            
+            // 매칭된 영수증 검색
+            const accordionItems = document.querySelectorAll('.accordion-item');
+            accordionItems.forEach(item => {
+                const customerText = item.querySelector('.accordion-button').textContent.toLowerCase();
+                const rows = item.querySelectorAll('.table tbody tr');
+                let hasMatch = customerText.includes(searchValue);
+                
+                rows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    if (text.includes(searchValue)) hasMatch = true;
+                });
+                
+                item.style.display = hasMatch ? '' : 'none';
+            });
 
-function zoomIn() {
-    scale += 0.1;
-    if (image) image.style.transform = `scale(${scale})`;
-}
-
-function zoomOut() {
-    scale = Math.max(0.1, scale - 0.1);
-    if (image) image.style.transform = `scale(${scale})`;
-}
-
-function resetZoom() {
-    scale = 1;
-    if (image) image.style.transform = `scale(${scale})`;
-}
-
-document.querySelector('.image-container')?.addEventListener('wheel', function(event) {
-    event.preventDefault();
-    event.deltaY < 0 ? zoomIn() : zoomOut();
-});
-
-function selectReceipt(receiptNumber, filePath, receiptId) {
-    const newReceiptInput = document.querySelector('input[name="new_receipt_number"]');
-    const leftPanel = document.querySelector('.left-panel');
-    const form = document.getElementById('update-form');
-
-    newReceiptInput.value = receiptNumber;
-    form.action = `/edit_unmatched/${receiptId}`;
-
-    leftPanel.innerHTML = `
-        <h3>선택된 영수증</h3>
-        <div class="image-container">
-            <img class="receipt-image" id="receipt-image" src="${filePath}" alt="Selected Receipt">
-        </div>
-        <div class="zoom-controls">
-            <button type="button" class="btn btn-secondary" onclick="zoomIn()">확대 (+)</button>
-            <button type="button" class="btn btn-secondary" onclick="zoomOut()">축소 (-)</button>
-            <button type="button" class="btn btn-secondary" onclick="resetZoom()">초기화</button>
-        </div>
-    `;
-    scale = 1;
-    image = document.getElementById('receipt-image');
-    clearError();
-}
-
-function searchReceipt() {
-    const receiptNumber = document.querySelector('input[name="new_receipt_number"]').value;
-    const batchId = document.querySelector('input[name="upload_batch_id"]').value;
-    window.location.href = `/edit_unmatched/${encodeURIComponent(receiptNumber)}?upload_batch_id=${batchId}`;
-    clearError();
-}
-
-function showError(message) {
-    const errorMessage = document.getElementById('error-message');
-    const receiptInput = document.querySelector('input[name="new_receipt_number"]');
-    errorMessage.style.display = 'block';
-    errorMessage.textContent = message;
-    receiptInput.classList.add('input-error');
-}
-
-function clearError() {
-    const errorMessage = document.getElementById('error-message');
-    const receiptInput = document.querySelector('input[name="new_receipt_number"]');
-    errorMessage.style.display = 'none';
-    errorMessage.textContent = '';
-    receiptInput.classList.remove('input-error');
-}
-
-document.getElementById('update-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    clearError();
-
-    const receiptInput = document.querySelector('input[name="new_receipt_number"]');
-    const newValue = receiptInput.value.trim();
-    if (!newValue) {
-        showError('영수증 번호를 입력해주세요.');
-        return;
-    }
-
-    const formData = new FormData(e.target);
-    try {
-        const response = await fetch(e.target.action, {
-            method: 'POST',
-            body: formData
+            // 매칭되지 않은 영수증 검색
+            const unmatchedItems = document.querySelectorAll('.unmatched-list .list-group-item');
+            unmatchedItems.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(searchValue) ? '' : 'none';
+            });
         });
-        if (response.ok) {
-            const batchId = document.querySelector('input[name="upload_batch_id"]').value;
-            window.location.href = `/result/?upload_batch_id=${batchId}`;
-        } else {
-            const result = await response.json();
-            showError(result.error || result.detail || '오류가 발생했습니다.');
-        }
-    } catch (error) {
-        console.error('Error updating receipt:', error);
-        showError('서버 오류가 발생했습니다.');
-    }
-});
-
-// === input.html 관련 ===
-const dropZone = document.getElementById('dropZone');
-const fileInput = document.getElementById('folderInput');
-const submitBtn = document.getElementById('submitBtn');
-const spinner = document.getElementById('spinner');
-const resultBox = document.getElementById('resultBox');
-const uploadForm = document.getElementById('uploadForm');
-const progressStatus = document.getElementById('progressBar');
-const progressCount = document.getElementById('progressCount');
-
-dropZone?.addEventListener('click', () => fileInput?.click());
-dropZone?.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('dragover');
-});
-dropZone?.addEventListener('dragleave', () => {
-    dropZone.classList.remove('dragover');
-});
-dropZone?.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropZone.classList.remove('dragover');
-    const files = e.dataTransfer.files;
-    if (files.length && files[0].name.endsWith('.zip')) {
-        fileInput.files = files;
-        document.getElementById('fileNameDisplay').textContent = `선택된 파일: ${files[0].name}`;
-    } else {
-        resultBox.innerHTML = '<div class="alert alert-danger">ZIP 파일만 업로드 가능합니다.</div>';
-    }
-});
-
-fileInput?.addEventListener('change', () => {
-    if (fileInput.files.length && fileInput.files[0].name.endsWith('.zip')) {
-        document.getElementById('fileNameDisplay').textContent = `선택된 파일: ${fileInput.files[0].name}`;
-    } else {
-        resultBox.innerHTML = '<div class="alert alert-danger">ZIP 파일만 선택해주세요.</div>';
-        fileInput.value = '';
-    }
-});
-
-uploadForm?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!fileInput.files.length) {
-        resultBox.innerHTML = '<div class="alert alert-danger">파일을 선택해주세요.</div>';
-        return;
     }
 
-    submitBtn.disabled = true;
-    spinner.style.display = 'inline-block';
-    resultBox.innerHTML = '<div class="alert alert-info">파일을 처리 중입니다...</div>';
-    startProgressPolling();
-
-    const formData = new FormData();
-    formData.append('folder', fileInput.files[0]);
-    try {
-        const response = await fetch('/result/', {
-            method: 'POST',
-            body: formData,
-            headers: { 'Accept': 'text/html' }
-        });
-        if (response.ok) {
-            clearInterval(progressInterval);
-            const html = await response.text();
-            document.open();
-            document.write(html);
-            document.close();
-        } else {
-            const errorText = await response.text();
-            resultBox.innerHTML = `<div class="alert alert-danger">오류: ${errorText}</div>`;
-        }
-    } catch (error) {
-        console.error('Upload error:', error);
-        resultBox.innerHTML = `<div class="alert alert-danger">요청 실패: ${error.message}</div>`;
-    } finally {
-        submitBtn.disabled = false;
-        spinner.style.display = 'none';
-    }
-});
-
-let progressInterval = null;
-function startProgressPolling() {
-    if (!progressStatus || !progressCount) return;
-    progressStatus.style.display = 'block';
-    progressInterval = setInterval(async () => {
-        try {
-            const res = await fetch('/progress/');
-            const data = await res.json();
-            if (data.done !== undefined && data.total !== undefined) {
-                progressCount.textContent = `${data.done}/${data.total}`;
-                if (data.done >= data.total) {
-                    clearInterval(progressInterval);
-                    progressStatus.style.display = 'none';
+    // 수령증 다운로드 버튼 처리
+    const downloadBtn = document.getElementById('downloadBtn');
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            
+            const originalText = this.innerHTML;
+            const originalClass = this.className;
+            
+            try {
+                // 로딩 상태로 변경
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 생성 중...';
+                this.className = originalClass + ' loading';
+                this.style.pointerEvents = 'none';
+                
+                // 수령증 생성 요청
+                const response = await fetch('/generate-receipts/');
+                
+                if (response.ok) {
+                    // 다운로드 처리
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = "수령증_모음.zip";
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    // 성공 메시지
+                    showNotification('수령증이 성공적으로 다운로드되었습니다.', 'success');
+                } else {
+                    // 오류 처리
+                    const errorData = await response.json().catch(() => ({}));
+                    const errorMessage = errorData.detail || '수령증 생성 중 오류가 발생했습니다.';
+                    showNotification(`오류: ${errorMessage}`, 'error');
                 }
+            } catch (error) {
+                console.error('수령증 생성 오류:', error);
+                showNotification('네트워크 오류가 발생했습니다.', 'error');
+            } finally {
+                // 원래 상태로 복원
+                this.innerHTML = originalText;
+                this.className = originalClass;
+                this.style.pointerEvents = '';
             }
-        } catch (e) {
-            clearInterval(progressInterval);
-            console.error('진행 상태 에러:', e);
-            progressStatus.style.display = 'none';
-        }
-    }, 1000);
-}
-
-// === result.html 검색 필터 ===
-document.getElementById('searchInput')?.addEventListener('input', function() {
-    const searchValue = this.value.toLowerCase();
-    const accordionItems = document.querySelectorAll('.accordion-item');
-    accordionItems.forEach(item => {
-        const customerText = item.querySelector('.accordion-button').textContent.toLowerCase();
-        const rows = item.querySelectorAll('.table tbody tr');
-        let hasMatch = customerText.includes(searchValue);
-        rows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            if (text.includes(searchValue)) hasMatch = true;
         });
-        item.style.display = hasMatch ? '' : 'none';
-    });
+    }
 
-    const unmatchedItems = document.querySelectorAll('.unmatched-list .list-group-item');
-    unmatchedItems.forEach(item => {
-        const text = item.textContent.toLowerCase();
-        item.style.display = text.includes(searchValue) ? '' : 'none';
-    });
-});
-
-// 수령증 다운로드 버튼 클릭 시 오류 처리
-document.querySelector('a[href="/generate-receipts/"]')?.addEventListener('click', async function(e) {
-    e.preventDefault();
-    try {
-        // 로딩 표시
-        const btn = this;
-        const originalText = btn.textContent;
-        btn.textContent = "생성 중...";
-        btn.classList.add("disabled");
+    // 알림 함수
+    function showNotification(message, type = 'info') {
+        const alertClass = type === 'success' ? 'alert-success' : 
+                          type === 'error' ? 'alert-danger' : 'alert-info';
         
-        // 수령증 생성 요청
-        const response = await fetch('/generate-receipts/');
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        alertDiv.innerHTML = `
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle'}"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
         
-        if (response.ok) {
-            // 다운로드 링크 생성 및 클릭
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = "수령증_모음.zip";
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            
-            // 원래 버튼 상태로 복원
-            btn.textContent = originalText;
-            btn.classList.remove("disabled");
-        } else {
-            // 오류 처리
-            const errorData = await response.json();
-            alert(`오류: ${errorData.detail || '수령증 생성 중 오류가 발생했습니다.'}`);
-            
-            // 원래 버튼 상태로 복원
-            btn.textContent = originalText;
-            btn.classList.remove("disabled");
-        }
-    } catch (error) {
-        alert('수령증 생성 중 오류가 발생했습니다.');
-        console.error('수령증 생성 오류:', error);
+        document.body.appendChild(alertDiv);
         
-        // 원래 버튼 상태로 복원
-        const btn = document.querySelector('a[href="/generate-receipts/"]');
-        btn.textContent = "수령증 다운로드";
-        btn.classList.remove("disabled");
+        // 5초 후 자동 제거
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
     }
 });
 </script>
-</body>
-</html>
+{% endblock %}

@@ -1,3 +1,5 @@
+# app/services/GenerateReceiptForm.py 수정
+
 from sqlalchemy import text
 from app.core.database import SessionLocal
 import openpyxl
@@ -6,7 +8,7 @@ import os
 from openpyxl.styles import Alignment
 from datetime import datetime
 
-def get_matched_name_and_payback():
+def get_matched_name_and_payback(user_id):  # user_id 매개변수 추가
     TEMPLATE_PATH = "/Users/gimdonghun/Downloads/수령증양식.xlsx"
     OUTPUT_DIR = "/Users/gimdonghun/Downloads/수령증_완성본"
     
@@ -16,28 +18,28 @@ def get_matched_name_and_payback():
     
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
-    # 두 테이블 비교해서 view테이블에서 조회만 할 수 있게 하기
+    # 사용자별 데이터 조회
     sql1 = """
     SELECT e."name", e."PayBack"
     FROM excel_data e
     JOIN receipt_match_log m
     ON e."receiptNumber" = m.receipt_number
-    WHERE m.is_matched = TRUE;
+    WHERE m.is_matched = TRUE AND m.user_id = :user_id;
     """
 
     sql2 = """
     SELECT p.passport_number, p.birthday, p.name
     FROM passports p
-    WHERE p.name = :name;
+    WHERE p.name = :name AND p.user_id = :user_id;
     """
 
     with SessionLocal() as session:
-        results = session.execute(text(sql1)).fetchall()
+        results = session.execute(text(sql1), {"user_id": user_id}).fetchall()
         printed_people = set()
 
         for name, payback in results:
             passport_result = session.execute(
-                text(sql2), {"name": name}
+                text(sql2), {"name": name, "user_id": user_id}
             ).fetchone()
 
             if passport_result:
@@ -55,17 +57,17 @@ def get_matched_name_and_payback():
                 ws = wb.active
                 alignment = Alignment(horizontal="center", vertical="center")
                 ws["D7"] = name
-                ws["D7"].alignment = alignment # 가운데 정렬
+                ws["D7"].alignment = alignment
                 ws["D8"] = passport_number
-                ws["D8"].alignment = alignment # 가운데 정렬
+                ws["D8"].alignment = alignment
                 ws["D9"] = birthday
-                ws["D9"].alignment = alignment # 가운데 정렬
-                ws["D10"] = payback # 테스트
-                ws["D10"].alignment = alignment # 가운데 정렬
+                ws["D9"].alignment = alignment
+                ws["D10"] = payback
+                ws["D10"].alignment = alignment
                 today = datetime.today()
                 formatted_date = f"{today.year}년    {today.month:02}월    {today.day:02}일"
                 ws["B16"] = formatted_date
-                ws["B16"].alignment = alignment  # 가운데 정렬
+                ws["B16"].alignment = alignment
                 wb.save(output_path)
                 
     return OUTPUT_DIR

@@ -4,7 +4,7 @@ from app.models.models import Receipt, Passport, UnrecognizedImage
 from app.core.database import SessionLocal
 import json
 
-def AiOcr(imagePath):
+def AiOcr(imagePath, user_id):
     db = SessionLocal()
     try:
         # OCR 및 GPT 처리
@@ -26,6 +26,7 @@ def AiOcr(imagePath):
             
             for receiptNumber in receipt_numbers:
                 new_receipt = Receipt(
+                    user_id=user_id,
                     receipt_number=receiptNumber,
                     file_path=imagePath
                 )
@@ -39,6 +40,7 @@ def AiOcr(imagePath):
                 PassportBirthday = passport.get('birthDay', '')
 
                 new_passport = Passport(
+                    user_id=user_id,
                     file_path=imagePath,
                     name=PassportName,
                     birthday=PassportBirthday,

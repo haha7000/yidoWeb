@@ -19,7 +19,7 @@ try:
         print("데이터베이스 연결 성공!")
         
         # 엑셀 파일 경로
-        excel_path = "/Users/gimdonghun/Downloads/testExcel_1.xlsx"
+        excel_path = "/Users/gimdonghun/Downloads/testExcel_3.xlsx"
         print(f"엑셀 파일 읽기: {excel_path}")
         
         # 엑셀 파일 읽기

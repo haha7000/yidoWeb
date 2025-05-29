@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>영수증 OCR - 처리 시스템</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <style>
         body {
@@ -24,19 +25,201 @@
             background-color: #007bff;
             color: white;
         }
+        
+        /* 이미지 줌 관련 스타일 */
+        .image-container {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            height: 400px;
+        }
+        
+        .receipt-image, .passport-image {
+            max-width: 100%;
+            height: auto;
+            cursor: grab;
+            transition: transform 0.1s ease;
+        }
+        
+        .receipt-image:active, .passport-image:active {
+            cursor: grabbing;
+        }
+        
+        .zoom-controls {
+            margin-top: 10px;
+        }
+        
+        .input-error {
+            border-color: #dc3545 !important;
+            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+        }
+        
+        #error-message {
+            color: #dc3545;
+            font-size: 0.875em;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
+    <!-- 네비게이션 바 -->
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container">
-            <a class="navbar-brand" href="/result/">OCR 처리 시스템</a>
+            <a class="navbar-brand" href="/upload/">OCR 처리 시스템</a>
             <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="/">새로운 처리</a>
+                {% if user %}
+                <span class="nav-link">안녕하세요, {{ user.username }}님</span>
+                <a class="nav-link" href="#" onclick="logout()">로그아웃</a>
+                {% else %}
+                <a class="nav-link" href="/">로그인</a>
+                {% endif %}
             </div>
         </div>
     </nav>
 
-    {% block content %}{% endblock %}
+    <!-- 메인 콘텐츠 영역 -->
+    {% block content %}
+    <!-- 여기에 각 페이지의 고유 콘텐츠가 들어갑니다 -->
+    {% endblock %}
 
+    <!-- 공통 JavaScript -->
+    <script>
+        // 로그아웃 함수
+        async function logout() {
+            try {
+                const response = await fetch('/logout/', { method: 'GET' });
+                if (response.ok) {
+                    // 쿠키 삭제
+                    document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                    window.location.href = '/';
+                } else {
+                    console.error('로그아웃 실패');
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('로그아웃 오류:', error);
+                window.location.href = '/';
+            }
+        }
+
+        // 이미지 줌 기능
+        let scale = 1;
+        let currentImage = null;
+
+        function setCurrentImage(imageId) {
+            currentImage = document.getElementById(imageId);
+            scale = 1;
+        }
+
+        function zoomIn() {
+            scale += 0.1;
+            if (currentImage) {
+                currentImage.style.transform = `scale(${scale})`;
+            }
+        }
+
+        function zoomOut() {
+            scale = Math.max(0.1, scale - 0.1);
+            if (currentImage) {
+                currentImage.style.transform = `scale(${scale})`;
+            }
+        }
+
+        function resetZoom() {
+            scale = 1;
+            if (currentImage) {
+                currentImage.style.transform = `scale(${scale})`;
+            }
+        }
+
+        // 페이지 로드 시 이미지 설정
+        document.addEventListener('DOMContentLoaded', function() {
+            // 영수증 이미지가 있으면 설정
+            const receiptImage = document.getElementById('receipt-image');
+            if (receiptImage) {
+                setCurrentImage('receipt-image');
+                setupImageDrag(receiptImage);
+            }
+
+            // 여권 이미지가 있으면 설정
+            const passportImage = document.getElementById('passport-image');
+            if (passportImage) {
+                setCurrentImage('passport-image');
+                setupImageDrag(passportImage);
+            }
+
+            // 마우스 휠 이벤트 설정
+            const imageContainers = document.querySelectorAll('.image-container');
+            imageContainers.forEach(container => {
+                container.addEventListener('wheel', function(event) {
+                    event.preventDefault();
+                    if (event.deltaY < 0) {
+                        zoomIn();
+                    } else {
+                        zoomOut();
+                    }
+                });
+            });
+        });
+
+        // 이미지 드래그 기능 설정
+        function setupImageDrag(image) {
+            let isDragging = false;
+            let startX, startY, initialX = 0, initialY = 0;
+
+            image.addEventListener('mousedown', function(e) {
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                
+                const transform = window.getComputedStyle(image).transform;
+                if (transform !== 'none') {
+                    const matrix = new WebKitCSSMatrix(transform);
+                    initialX = matrix.m41;
+                    initialY = matrix.m42;
+                } else {
+                    initialX = 0;
+                    initialY = 0;
+                }
+                
+                image.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+                
+                image.style.transform = `scale(${scale}) translate(${(initialX + deltaX) / scale}px, ${(initialY + deltaY) / scale}px)`;
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    image.style.cursor = 'grab';
+                }
+            });
+        }
+
+        // 에러 표시 함수들
+        function showError(message) {
+            const errorMessage = document.getElementById('error-message');
+            if (errorMessage) {
+                errorMessage.style.display = 'block';
+                errorMessage.textContent = message;
+            }
+        }
+
+        function clearError() {
+            const errorMessage = document.getElementById('error-message');
+            if (errorMessage) {
+                errorMessage.style.display = 'none';
+                errorMessage.textContent = '';
+            }
+        }
+    </script>
 </body>
-</html> 
+</html>

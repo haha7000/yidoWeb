@@ -2,34 +2,74 @@
 
 {% block content %}
 <div class="container mt-5">
-    <h2>영수증 정보 수정</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>영수증 정보 수정</h2>
+        <span class="badge bg-info">사용자: {{ user.username }}</span>
+    </div>
+    
     <div class="row">
         <div class="col-md-6">
-            <div class="card mt-4">
+            <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">영수증 이미지</h5>
-                    <div class="image-container" style="max-width: 100%; overflow: hidden; margin: 20px 0;">
-                        <img class="receipt-image" id="receipt-image" src="/uploads/{{ receipt.file_path.split('/')[-1] }}" alt="Selected Receipt" style="width: 100%;">
+                    <div class="image-container">
+                        {% if receipt.file_path %}
+                        <img class="receipt-image" id="receipt-image" 
+                             src="/{{ receipt.file_path }}" 
+                             alt="Receipt Image" 
+                             style="width: 100%; cursor: grab;">
+                        {% else %}
+                        <div class="text-center p-5 text-muted">
+                            <i class="fas fa-receipt fa-3x mb-3"></i>
+                            <p>이미지를 찾을 수 없습니다</p>
+                        </div>
+                        {% endif %}
                     </div>
-                    <div class="zoom-controls">
-                        <button type="button" class="btn btn-secondary" onclick="zoomIn()">확대 (+)</button>
-                        <button type="button" class="btn btn-secondary" onclick="zoomOut()">축소 (-)</button>
-                        <button type="button" class="btn btn-secondary" onclick="resetZoom()">초기화</button>
+                    <div class="zoom-controls text-center">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="zoomIn()">
+                            <i class="fas fa-search-plus"></i> 확대
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="zoomOut()">
+                            <i class="fas fa-search-minus"></i> 축소
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetZoom()">
+                            <i class="fas fa-undo"></i> 초기화
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
+        
         <div class="col-md-6">
-            <div class="card mt-4">
+            <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">영수증 번호 수정</h5>
-                    <form method="POST" action="{{ url_for('update_unmatched', receipt_id=receipt.id) }}">
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>현재 영수증 번호:</strong> {{ receipt.receipt_number or '없음' }}
+                    </div>
+                    
+                    <!-- 에러 메시지 표시 영역 -->
+                    <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+                    
+                    <form id="update-form" method="POST" action="/edit_unmatched/{{ receipt.id }}">
                         <div class="mb-3">
-                            <label for="new_receipt_number" class="form-label">영수증 번호</label>
-                            <input type="text" class="form-control" id="new_receipt_number" name="new_receipt_number" value="{{ receipt.receipt_number }}" required>
+                            <label for="new_receipt_number" class="form-label">새 영수증 번호 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="new_receipt_number" 
+                                   name="new_receipt_number" value="{{ receipt.receipt_number or '' }}" 
+                                   required placeholder="정확한 영수증 번호를 입력하세요">
+                            <div class="form-text">엑셀 데이터에 있는 영수증 번호와 정확히 일치해야 합니다.</div>
                         </div>
-                        <button type="submit" class="btn btn-primary">저장</button>
-                        <a href="{{ url_for('result') }}" class="btn btn-secondary">취소</a>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-check"></i> 저장 및 매칭 확인
+                            </button>
+                            <a href="/result/" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> 결과 페이지로 돌아가기
+                            </a>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -38,27 +78,53 @@
 </div>
 
 <script>
-    let scale = 1;
-    let image = document.getElementById('receipt-image');
+    // 폼 제출 처리
+    document.getElementById('update-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        clearError();
 
-    function zoomIn() {
-        scale += 0.1;
-        if (image) image.style.transform = `scale(${scale})`;
-    }
+        const receiptInput = document.querySelector('input[name="new_receipt_number"]');
+        const newValue = receiptInput.value.trim();
+        
+        if (!newValue) {
+            showError('영수증 번호를 입력해주세요.');
+            receiptInput.classList.add('input-error');
+            return;
+        }
 
-    function zoomOut() {
-        scale = Math.max(0.1, scale - 0.1);
-        if (image) image.style.transform = `scale(${scale})`;
-    }
-
-    function resetZoom() {
-        scale = 1;
-        if (image) image.style.transform = `scale(${scale})`;
-    }
-
-    document.querySelector('.image-container')?.addEventListener('wheel', function(event) {
-        event.preventDefault();
-        event.deltaY < 0 ? zoomIn() : zoomOut();
+        receiptInput.classList.remove('input-error');
+        
+        const formData = new FormData(this);
+        
+        try {
+            const response = await fetch(this.action, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                // 성공 시 결과 페이지로 리다이렉트
+                window.location.href = '/result/';
+            } else {
+                // 오류 처리
+                const contentType = response.headers.get('Content-Type');
+                let errorMessage = '오류가 발생했습니다.';
+                
+                if (contentType && contentType.includes('application/json')) {
+                    const result = await response.json();
+                    errorMessage = result.error || result.detail || errorMessage;
+                } else {
+                    errorMessage = `서버 오류 (${response.status})`;
+                }
+                
+                showError(errorMessage);
+                receiptInput.classList.add('input-error');
+            }
+        } catch (error) {
+            console.error('Error updating receipt:', error);
+            showError('네트워크 오류가 발생했습니다.');
+            receiptInput.classList.add('input-error');
+        }
     });
 </script>
 {% endblock %}
