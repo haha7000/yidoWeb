@@ -4,7 +4,7 @@ from app.models.models import Receipt, Passport, UnrecognizedImage
 from app.core.database import SessionLocal
 import json
 
-def AiOcr(imagePath, user_id):
+def LotteAiOcr(imagePath, user_id):
     db = SessionLocal()
     try:
         # OCR 및 GPT 처리

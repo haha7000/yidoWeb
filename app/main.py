@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import FileResponse, RedirectResponse
 import zipfile, tempfile, os, shutil
 from app.services.passportMatching import matching_passport, get_unmatched_passports, update_passport_matching_status
-from app.services.testFinder2 import AiOcr
+from app.services.LotteFinder import LotteAiOcr
 from app.services.matching import matchingResult, fetch_results
 from app.services.GenerateReceiptForm import get_matched_name_and_payback
 from app.core.database import SessionLocal
@@ -208,7 +208,7 @@ async def result(
         print(f"전체 이미지 수: {progress['total']}")
         for img in imgs:
             try:
-                AiOcr(img, current_user.id)
+                LotteAiOcr(img, current_user.id)
             except Exception as e:
                 print(f"이미지 처리 중 오류 발생: {img} - {str(e)}")
             finally:
