@@ -41,6 +41,7 @@ class Passport(Base):
 
     user = relationship("User", back_populates="passports")
 
+    
 class Receipt(Base):
     __tablename__ = "receipts"
 
