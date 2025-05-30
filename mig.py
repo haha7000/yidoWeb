@@ -1,32 +1,51 @@
-# migration_add_users.py
+# migration_add_duty_free.py
 from app.core.database import my_engine
 from app.models.models import Base
 from sqlalchemy import text
+from sqlalchemy.sql import func
+from sqlalchemy import Column, TIMESTAMP
+
+created_at = Column(TIMESTAMP, server_default=func.now())
 
 # 1. 새 테이블 생성
 Base.metadata.create_all(bind=my_engine)
 
-# 2. 기존 테이블에 user_id 컬럼 추가 (수동으로 실행)
+# 2. 기존 테이블에 컬럼 추가 및 새 테이블 생성
 with my_engine.connect() as conn:
-    # 기본 사용자 생성 (기존 데이터용)
-    conn.execute(text("""
-        INSERT INTO users (username, email, hashed_password, is_active)
-        VALUES ('admin', 'admin@example.com', '$2b$12$example_hash', true)
-        ON CONFLICT DO NOTHING;
-    """))
-    
-    # 기존 테이블에 user_id 컬럼 추가
-    conn.execute(text("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);"))
-    conn.execute(text("ALTER TABLE passports ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);"))
-    conn.execute(text("ALTER TABLE receipt_match_log ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);"))
-    conn.execute(text("ALTER TABLE unrecognized_images ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);"))
-    
-    # 기존 데이터에 기본 사용자 ID 할당
-    conn.execute(text("UPDATE receipts SET user_id = 1 WHERE user_id IS NULL;"))
-    conn.execute(text("UPDATE passports SET user_id = 1 WHERE user_id IS NULL;"))
-    conn.execute(text("UPDATE receipt_match_log SET user_id = 1 WHERE user_id IS NULL;"))
-    conn.execute(text("UPDATE unrecognized_images SET user_id = 1 WHERE user_id IS NULL;"))
-    
-    conn.commit()
+    try:
+        # users 테이블에 duty_free_type 컬럼 추가
+        conn.execute(text("""
+            ALTER TABLE users 
+            ADD COLUMN IF NOT EXISTS duty_free_type VARCHAR(20) DEFAULT 'lotte';
+        """))
+        print("✅ duty_free_type 컬럼 추가 완료")
+        
+        # 신라 영수증 테이블 생성
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS shilla_receipts (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) NOT NULL,
+                file_path TEXT,
+                receipt_number VARCHAR(50),
+                passport_number VARCHAR(20),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """))
+        print("✅ shilla_receipts 테이블 생성 완료")
+        
+        # 기존 사용자들의 duty_free_type을 기본값으로 설정
+        conn.execute(text("""
+            UPDATE users 
+            SET duty_free_type = 'lotte' 
+            WHERE duty_free_type IS NULL;
+        """))
+        print("✅ 기존 사용자 duty_free_type 설정 완료")
+        
+        conn.commit()
+        
+    except Exception as e:
+        print(f"❌ 마이그레이션 중 오류 발생: {e}")
+        conn.rollback()
 
-print("마이그레이션 완료!")
+print("📦 면세점 관련 마이그레이션 완료!")
+print("💡 엑셀 데이터 테이블은 업로드 시 동적으로 생성됩니다.")

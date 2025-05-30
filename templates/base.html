@@ -66,10 +66,12 @@
     <!-- 네비게이션 바 -->
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container">
-            <a class="navbar-brand" href="/upload/">OCR 처리 시스템</a>
+            <a class="navbar-brand" href="/upload/">
+                <img src="/static/YidoLogo.png" alt="로고" style="height: 80px;">
+            </a>
             <div class="navbar-nav ms-auto">
                 {% if user %}
-                <span class="nav-link">안녕하세요, {{ user.username }}님</span>
+                <span class="nav-link">환영합니다, {{ user.username }}님</span>
                 <a class="nav-link" href="#" onclick="logout()">로그아웃</a>
                 {% else %}
                 <a class="nav-link" href="/">로그인</a>

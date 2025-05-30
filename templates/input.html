@@ -8,12 +8,16 @@
                 <img src="/static/YidoLogo.png" alt="로고" style="height: 80px;">
                 <h3 class="mt-3">ZIP 파일 업로드</h3>
                 <p class="text-muted">영수증과 여권 이미지가 포함된 ZIP 파일을 업로드하세요</p>
+                <div class="badge bg-info mb-2">{{ duty_free_type }}</div>
             </div>
             
             <!-- 이전 결과 확인 버튼 -->
             <div class="text-center mb-4">
                 <a href="/result/" class="btn btn-outline-info me-2" id="viewResultBtn">
                     <i class="fas fa-history me-2"></i>이전 처리 결과 보기
+                </a>
+                <a href="/excel-upload/" class="btn btn-outline-success me-2">
+                    <i class="fas fa-file-excel me-2"></i>엑셀 데이터 업로드
                 </a>
                 <button type="button" class="btn btn-outline-secondary" onclick="checkProcessingStatus()">
                     <i class="fas fa-info-circle me-2"></i>처리 현황 확인
@@ -55,6 +59,7 @@
                             <li><i class="fas fa-check text-success me-2"></i>지원 형식: JPG, PNG, JPEG</li>
                             <li><i class="fas fa-check text-success me-2"></i>한글 및 영문 텍스트 자동 인식</li>
                             <li><i class="fas fa-check text-success me-2"></i>처리 완료 후 수령증 자동 생성</li>
+                            <li class="mt-2"><i class="fas fa-info-circle text-warning me-2"></i><strong>엑셀 데이터를 먼저 업로드해주세요!</strong></li>
                         </ul>
                     </div>
                 </div>

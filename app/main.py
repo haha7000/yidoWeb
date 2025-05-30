@@ -5,10 +5,12 @@ from fastapi.responses import FileResponse, RedirectResponse
 import zipfile, tempfile, os, shutil
 from app.services.passportMatching import matching_passport, get_unmatched_passports, update_passport_matching_status
 from app.services.LotteFinder import LotteAiOcr
+from app.services.ShillaFinder import ShillaAiOcr  # 추가
 from app.services.matching import matchingResult, fetch_results
+from app.services.shilla_matching import shilla_matching_result  # 추가 (신라 전용 매칭 로직)
 from app.services.GenerateReceiptForm import get_matched_name_and_payback
 from app.core.database import SessionLocal
-from app.models.models import User, Receipt, Passport, ReceiptMatchLog
+from app.models.models import User, Receipt, Passport, ReceiptMatchLog, DutyFreeType, ShillaReceipt
 from datetime import datetime
 from sqlalchemy.sql import text
 from sqlalchemy.orm import Session
@@ -21,6 +23,8 @@ from app.core.auth import (
 )
 from datetime import timedelta
 from passlib.context import CryptContext
+import pandas as pd
+import time
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -43,16 +47,18 @@ def main_page(request: Request, db: Session = Depends(get_db)):
     
     return templates.TemplateResponse("login.html", {"request": request})
 
+
 @app.get("/register") # 회원가입 페이지
 def register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
 
-@app.post("/register/") # 폼 기반 회원가입
+@app.post("/register/") # 폼 기반 회원가입 - 면세점 타입 추가
 async def register_user(
     request: Request,
     username: str = Form(...),
     email: str = Form(...), 
     password: str = Form(...),
+    duty_free_type: str = Form("lotte"),  # 기본값 lotte
     db: Session = Depends(get_db)
 ):
     try:
@@ -73,12 +79,16 @@ async def register_user(
                     "error": "이미 존재하는 이메일입니다."
                 })
         
+        # 면세점 타입 변환
+        duty_free_enum = DutyFreeType.LOTTE if duty_free_type == "lotte" else DutyFreeType.SHILLA
+        
         # 사용자 생성
         hashed_password = pwd_context.hash(password)
         user = User(
             username=username,
             email=email,
-            hashed_password=hashed_password
+            hashed_password=hashed_password,
+            duty_free_type=duty_free_enum  # 면세점 타입 저장
         )
         
         db.add(user)
@@ -145,10 +155,272 @@ async def logout(response: Response):
 
 @app.get("/upload/")
 def form(request: Request, current_user: User = Depends(get_current_user)):
+    duty_free_type = "롯데면세점" if current_user.duty_free_type == DutyFreeType.LOTTE else "신라면세점"
     return templates.TemplateResponse("input.html", {
         "request": request,
-        "user": current_user
+        "user": current_user,
+        "duty_free_type": duty_free_type  # 면세점 타입 전달
     })
+
+@app.post("/upload-excel/")
+async def upload_excel(
+    excel_file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    tmp_path = None
+    try:
+        start_time = time.time()
+        
+        # 엑셀 파일 임시 저장
+        tmp_path = f"/tmp/{excel_file.filename}"
+        with open(tmp_path, "wb") as f:
+            shutil.copyfileobj(excel_file.file, f)
+        
+        records_before = 0
+        records_added = 0
+        
+        # 면세점 타입에 따라 다른 처리 로직
+        if current_user.duty_free_type == DutyFreeType.LOTTE:
+            table_name = 'lotte_excel_data'
+            
+            # 롯데 엑셀 데이터 처리
+            try:
+                # 멀티헤더 엑셀 파일 읽기
+                df = pd.read_excel(tmp_path, header=[0, 1])
+                
+                # 병합된 멀티헤더를 1단 컬럼으로 변환
+                df.columns = [f"{str(a).strip()}_{str(b).strip()}" if 'Unnamed' not in str(b) else str(a).strip()
+                            for a, b in df.columns]
+                
+                print(f"원본 컬럼들: {list(df.columns)}")
+                
+                # "매출_" 접두어 제거
+                df.columns = [col.replace("매출_", "") for col in df.columns]
+                
+                # 불필요한 컬럼 제거
+                columns_to_remove = ['순번', '0', '여행사', '여행사코드', '수입/로컬']
+                df = df.drop(columns=[col for col in columns_to_remove if col in df.columns], errors='ignore')
+                
+                # 컬럼명 변경 - 핵심 컬럼들만 확인
+                rename_mapping = {}
+                for col in df.columns:
+                    if '교환권번호' in col or 'receiptNumber' in col:
+                        rename_mapping[col] = 'receiptNumber'
+                    elif '고객명' in col or 'name' in col:
+                        rename_mapping[col] = 'name'
+                    elif 'PayBack' in col or '환급' in col or '페이백' in col or '수수료' in col:
+                        rename_mapping[col] = 'PayBack'
+                
+                print(f"컬럼 매핑: {rename_mapping}")
+                df = df.rename(columns=rename_mapping)
+                
+                # 필수 컬럼 확인
+                required_columns = ['receiptNumber', 'name']
+                missing_columns = [col for col in required_columns if col not in df.columns]
+                
+                if missing_columns:
+                    raise Exception(f"필수 컬럼이 없습니다: {missing_columns}")
+                
+                # PayBack 컬럼이 없으면 기본값 설정
+                if 'PayBack' not in df.columns:
+                    df['PayBack'] = 0
+                
+                print(f"최종 컬럼들: {list(df.columns)}")
+                print(f"데이터 샘플: {df.head()}")
+                
+            except Exception as e:
+                # 단순 헤더 파일로 다시 시도
+                print(f"멀티헤더 처리 실패, 단순 헤더로 재시도: {e}")
+                df = pd.read_excel(tmp_path)
+                print(f"단순 헤더 컬럼들: {list(df.columns)}")
+                
+                # 컬럼명 변경
+                rename_mapping = {}
+                for col in df.columns:
+                    if '교환권번호' in str(col) or 'receiptNumber' in str(col):
+                        rename_mapping[col] = 'receiptNumber'
+                    elif '고객명' in str(col) or 'name' in str(col):
+                        rename_mapping[col] = 'name'
+                    elif 'PayBack' in str(col) or '환급' in str(col) or '페이백' in str(col) or '수수료' in str(col):
+                        rename_mapping[col] = 'PayBack'
+                
+                df = df.rename(columns=rename_mapping)
+                
+                # 필수 컬럼 확인
+                if 'receiptNumber' not in df.columns or 'name' not in df.columns:
+                    raise Exception("필수 컬럼(receiptNumber, name)을 찾을 수 없습니다.")
+                
+                # PayBack 컬럼이 없으면 기본값 설정
+                if 'PayBack' not in df.columns:
+                    df['PayBack'] = 0
+        
+        else:
+            table_name = 'shilla_excel_data'
+            
+            # 신라 엑셀 데이터 처리 (단순한 헤더 구조)
+            df = pd.read_excel(tmp_path, dtype={'BILL 번호': str})
+            print(f"신라 엑셀 원본 컬럼들: {list(df.columns)}")
+
+            # 컬럼명 변경
+            df.rename(columns={'BILL 번호': 'receiptNumber', '고객명': 'name', '수수료': 'PayBack'}, inplace=True)
+            
+            # 필수 컬럼 확인
+            if 'receiptNumber' not in df.columns:
+                raise Exception("영수증 번호 컬럼(BILL 번호)을 찾을 수 없습니다.")
+            if 'name' not in df.columns:
+                raise Exception("고객명 컬럼을 찾을 수 없습니다.")
+            
+            # receiptNumber를 문자열로 변환 (중요!)
+            df['receiptNumber'] = df['receiptNumber'].astype(str)
+            
+            # PayBack 컬럼이 없으면 기본값 설정
+            if 'PayBack' not in df.columns:
+                df['PayBack'] = 0
+                print("PayBack 컬럼이 없어서 기본값 0으로 설정")
+            
+            # 신라 전용: passport_number 컬럼 추가 (매칭 시 업데이트용)
+            df['passport_number'] = None
+            
+            # 중복 컬럼 제거 (같은 이름으로 매핑된 컬럼들)
+            df = df.loc[:, ~df.columns.duplicated()]
+            
+            print(f"신라 최종 컬럼들: {list(df.columns)}")
+            print(f"신라 데이터 샘플:\n{df.head()}")
+            print(f"receiptNumber 타입: {df['receiptNumber'].dtype}")
+        
+        # 새로운 엔진 연결로 트랜잭션 분리
+        from sqlalchemy import create_engine
+        from app.core.database import SQLALCHEMY_DATABASE_URL
+        
+        # 새로운 엔진으로 독립적인 연결 생성
+        temp_engine = create_engine(SQLALCHEMY_DATABASE_URL)
+        
+        with temp_engine.connect() as connection:
+            # 자동커밋 모드로 각 작업을 독립적으로 실행
+            connection.execute(text("BEGIN"))
+            
+            try:
+                # 기존 데이터 수 조회
+                try:
+                    count_sql = text(f"SELECT COUNT(*) FROM {table_name}")
+                    records_before = connection.execute(count_sql).scalar()
+                    print(f"기존 레코드 수: {records_before}")
+                except Exception as count_error:
+                    print(f"기존 데이터 조회 실패 (테이블이 없을 수 있음): {count_error}")
+                    records_before = 0
+                    # 트랜잭션 재시작
+                    connection.execute(text("ROLLBACK"))
+                    connection.execute(text("BEGIN"))
+                
+                # 기존 데이터와 중복 체크
+                existing_receipts = set()
+                try:
+                    existing_sql = text(f'SELECT "receiptNumber" FROM {table_name}')
+                    existing_data = connection.execute(existing_sql).fetchall()
+                    existing_receipts = {row[0] for row in existing_data if row[0]}
+                    print(f"기존 영수증 번호 수: {len(existing_receipts)}")
+                except Exception as existing_error:
+                    print(f"기존 데이터 조회 실패 (테이블이 없을 수 있음): {existing_error}")
+                    existing_receipts = set()
+                    # 트랜잭션 재시작
+                    connection.execute(text("ROLLBACK"))
+                    connection.execute(text("BEGIN"))
+                
+                # 중복되지 않은 데이터만 필터링
+                if existing_receipts:
+                    df_new = df[~df['receiptNumber'].isin(existing_receipts)]
+                else:
+                    df_new = df.copy()
+                
+                records_added = len(df_new)
+                print(f"추가할 레코드 수: {records_added}")
+                
+                if records_added > 0:
+                    # 데이터 저장 시도
+                    try:
+                        # 먼저 append로 시도
+                        df_new.to_sql(table_name, connection, if_exists='append', index=False)
+                        print(f"✅ {table_name} 테이블에 {records_added}개 레코드 추가 완료")
+                    except Exception as append_error:
+                        print(f"append 실패, replace로 재시도: {append_error}")
+                        # append 실패 시 rollback 후 replace로 시도
+                        connection.execute(text("ROLLBACK"))
+                        connection.execute(text("BEGIN"))
+                        
+                        # 전체 데이터로 테이블 새로 생성
+                        df.to_sql(table_name, connection, if_exists='replace', index=False)
+                        records_added = len(df)
+                        print(f"✅ {table_name} 테이블을 새로 생성하고 {records_added}개 레코드 추가 완료")
+                        records_before = 0  # 새로 생성했으므로 이전 데이터는 0
+                else:
+                    print("추가할 새로운 데이터가 없습니다.")
+                
+                # 트랜잭션 커밋
+                connection.execute(text("COMMIT"))
+                print("✅ 트랜잭션 커밋 완료")
+                
+            except Exception as e:
+                # 오류 발생 시 롤백
+                print(f"데이터베이스 작업 중 오류: {e}")
+                connection.execute(text("ROLLBACK"))
+                raise e
+        
+        # 임시 파일 삭제
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+            tmp_path = None
+        
+        processing_time = f"{time.time() - start_time:.2f}초"
+        
+        return {
+            "success": True,
+            "records_added": records_added,
+            "total_records": records_before + records_added,
+            "processing_time": processing_time,
+            "duty_free_type": current_user.duty_free_type.value
+        }
+        
+    except Exception as e:
+        # 전체 오류 처리
+        print(f"엑셀 처리 오류: {str(e)}")
+        
+        # 임시 파일 정리
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        
+        raise HTTPException(status_code=500, detail=f"엑셀 처리 중 오류: {str(e)}")
+
+
+@app.get("/excel-upload/")
+def excel_upload_page(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    duty_free_type = "롯데면세점" if current_user.duty_free_type == DutyFreeType.LOTTE else "신라면세점"
+    
+    # 현재 저장된 데이터 통계
+    total_records = 0
+    unique_customers = 0
+    
+    try:
+        if current_user.duty_free_type == DutyFreeType.LOTTE:
+            total_records = db.execute(text("SELECT COUNT(*) FROM lotte_excel_data")).scalar()
+            unique_customers = db.execute(text("SELECT COUNT(DISTINCT name) FROM lotte_excel_data")).scalar()
+        else:
+            total_records = db.execute(text("SELECT COUNT(*) FROM shilla_excel_data")).scalar()
+            unique_customers = db.execute(text("SELECT COUNT(DISTINCT name) FROM shilla_excel_data")).scalar()
+    except Exception as e:
+        print(f"데이터 통계 조회 오류: {e}")
+        # 테이블이 존재하지 않는 경우 0으로 설정
+        total_records = 0
+        unique_customers = 0
+    
+    return templates.TemplateResponse("excel_upload.html", {
+        "request": request,
+        "user": current_user,
+        "duty_free_type": duty_free_type,
+        "total_records": total_records,
+        "unique_customers": unique_customers
+    })
+
 
 @app.get("/progress/") # 진행상황 확인
 def get_progress():
@@ -164,6 +436,7 @@ async def result(
         # 시작 시간 기록
         start_time = datetime.now()
         print(f"\n처리 시작 시간: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"사용자 면세점 타입: {current_user.duty_free_type.value}")
 
         user_uploads_dir = f"uploads/user_{current_user.id}"
         os.makedirs(user_uploads_dir, exist_ok=True)
@@ -203,20 +476,29 @@ async def result(
                 }
             )
 
-        # 3) OCR→DB 저장
+        # 3) OCR→DB 저장 (면세점 타입에 따라 분기)
         progress["total"] = len(imgs); progress["done"]=0
         print(f"전체 이미지 수: {progress['total']}")
+        
         for img in imgs:
             try:
-                LotteAiOcr(img, current_user.id)
+                if current_user.duty_free_type == DutyFreeType.LOTTE:
+                    # 롯데 면세점 처리
+                    LotteAiOcr(img, current_user.id)
+                else:
+                    # 신라 면세점 처리
+                    ShillaAiOcr(img, current_user.id)
             except Exception as e:
                 print(f"이미지 처리 중 오류 발생: {img} - {str(e)}")
             finally:
                 progress["done"] += 1
                 print(f"처리 완료: {progress['done']}/{progress['total']}")
 
-        # 4) 매칭 실행
-        matchingResult(current_user.id)
+        # 4) 매칭 실행 (면세점 타입에 따라 분기)
+        if current_user.duty_free_type == DutyFreeType.LOTTE:
+            matchingResult(current_user.id)
+        else:
+            shilla_matching_result(current_user.id)  # 신라 전용 매칭 로직
 
         # 5) 조회용 리스트 생성
         matched, unmatched = fetch_results(current_user.id)
@@ -225,12 +507,10 @@ async def result(
         shutil.rmtree(tmp)
 
         # 종료 시간 기록 및 처리 시간 계산
-        # ------------------------------------------------------------
         end_time = datetime.now()
         processing_time = end_time - start_time
         print(f"처리 종료 시간: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"총 처리 시간: {processing_time.seconds}초 {processing_time.microseconds // 1000}밀리초")
-        # ------------------------------------------------------------
         
         return templates.TemplateResponse(
             "result.html",
@@ -238,7 +518,8 @@ async def result(
                 "request": request,
                 "results": matched,
                 "unmatched_receipts": unmatched,
-                "user": current_user
+                "user": current_user,
+                "duty_free_type": current_user.duty_free_type.value
             }
         )
     except Exception as e:
@@ -252,7 +533,8 @@ async def result(
                 "request": request,
                 "error": f"처리 중 오류가 발생했습니다: {str(e)}",
                 "results": [],
-                "unmatched_receipts": []
+                "unmatched_receipts": [],
+                "user": current_user
             }
         )
 
@@ -273,7 +555,8 @@ async def get_result(
                 "request": request,
                 "results": passport_info,
                 "unmatched_receipts": unmatched,
-                "user": current_user
+                "user": current_user,
+                "duty_free_type": current_user.duty_free_type.value
             }
         )
     except Exception as e:
@@ -284,7 +567,8 @@ async def get_result(
                 "request": request,
                 "error": f"결과 조회 중 오류가 발생했습니다: {str(e)}",
                 "results": [],
-                "unmatched_receipts": []
+                "unmatched_receipts": [],
+                "user": current_user
             }
         )
 
@@ -327,11 +611,19 @@ async def edit_unmatched(
 ):
     db = SessionLocal()
     try:
-        # 사용자의 영수증만 조회
-        receipt = db.query(Receipt).filter(
-            Receipt.id == receipt_id,
-            Receipt.user_id == current_user.id
-        ).first()
+        if current_user.duty_free_type == DutyFreeType.SHILLA:
+            # 신라 면세점용 처리
+            receipt = db.query(ShillaReceipt).filter(
+                ShillaReceipt.id == receipt_id,
+                ShillaReceipt.user_id == current_user.id
+            ).first()
+        else:
+            # 롯데 면세점용 처리
+            receipt = db.query(Receipt).filter(
+                Receipt.id == receipt_id,
+                Receipt.user_id == current_user.id
+            ).first()
+            
         if not receipt:
             raise HTTPException(status_code=404, detail="영수증을 찾을 수 없습니다.")
         
@@ -365,12 +657,20 @@ async def update_unmatched(
         old_receipt_number = receipt.receipt_number
         receipt.receipt_number = new_receipt_number
         
-        # excel_data에서 새 영수증 번호로 검색
-        sql = text("""
-            SELECT "receiptNumber"
-            FROM excel_data
-            WHERE "receiptNumber" = :receipt_number
-        """)
+        # 면세점 타입에 따라 다른 테이블에서 검색
+        if current_user.duty_free_type == DutyFreeType.LOTTE:
+            sql = text("""
+                SELECT "receiptNumber"
+                FROM lotte_excel_data
+                WHERE "receiptNumber" = :receipt_number
+            """)
+        else:
+            sql = text("""
+                SELECT "receiptNumber"
+                FROM shilla_excel_data
+                WHERE "receiptNumber" = :receipt_number
+            """)
+            
         result = db.execute(sql, {"receipt_number": new_receipt_number}).first()
         
         # 사용자의 매칭 로그 업데이트
@@ -513,12 +813,20 @@ async def update_passport(
                 except ValueError:
                     print(f"잘못된 날짜 형식: {birthday}")
             
-            # excel_data에서 새 이름으로 검색
-            sql = text("""
-                SELECT "receiptNumber", name, "PayBack" 
-                FROM excel_data 
-                WHERE name = :name
-            """)
+            # 면세점 타입에 따라 다른 테이블에서 검색
+            if current_user.duty_free_type == DutyFreeType.LOTTE:
+                sql = text("""
+                    SELECT "receiptNumber", name, "PayBack" 
+                    FROM lotte_excel_data 
+                    WHERE name = :name
+                """)
+            else:
+                sql = text("""
+                    SELECT "receiptNumber", name, "PayBack" 
+                    FROM shilla_excel_data 
+                    WHERE name = :name
+                """)
+                
             excel_result = db.execute(sql, {"name": new_name}).first()
             
             # 매칭 로그 업데이트

@@ -199,7 +199,12 @@
                     <div class="unmatched-list">
                         {% for receipt in unmatched_receipts %}
                         <div class="list-group-item list-group-item-action border-0">
+                            <!-- 면세점 타입에 따라 다른 링크 사용 -->
+                            {% if duty_free_type == "shilla" %}
                             <a href="/edit_unmatched/{{ receipt.id }}" class="text-decoration-none text-dark">
+                            {% else %}
+                            <a href="/edit_unmatched/{{ receipt.id }}" class="text-decoration-none text-dark">
+                            {% endif %}
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div class="flex-grow-1">
                                         <div class="fw-bold text-primary">

@@ -108,12 +108,16 @@ Your task is to:
 
 ---
 
-🧾 Final output format:
+🧾 **CRITICAL - EXACT JSON FORMAT REQUIRED**: 
+
+You MUST respond with this exact JSON structure. Do NOT return just an array. Always include the "receipts" and "passports" keys:
 
 {
   "receipts": [
-    {"receiptNumber": "90208724000593"},
-    {"receiptNumber": "92208724004591"}
+    {
+      "receiptNumber": "0124507700631",
+      "passportNumber": "E86196088"
+    }
   ],
   "passports": [
     {
@@ -123,6 +127,5 @@ Your task is to:
     }
   ]
 }
-
 
 
