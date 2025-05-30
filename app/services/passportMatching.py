@@ -1,3 +1,5 @@
+# app/services/passportMatching.py - 수정된 버전 (영수증 ID 포함)
+
 from app.models.models import Receipt, ReceiptMatchLog, Passport, User, DutyFreeType
 from app.core.database import SessionLocal
 from sqlalchemy import text
@@ -28,9 +30,9 @@ def fetch_results(user_id):
             """
             unmatched = db.execute(text(unmatched_sql), {"user_id": user_id}).fetchall()
         else:
-            # 신라 면세점인 경우 shilla_matching 모듈 사용
-            from app.services.shilla_matching import fetch_shilla_results
-            return fetch_shilla_results(user_id)
+            # 신라 면세점인 경우 수정된 함수 사용 (영수증 ID 포함)
+            from app.services.shilla_matching import fetch_shilla_results_with_receipt_ids
+            return fetch_shilla_results_with_receipt_ids(user_id)
 
         return matched, unmatched
     
@@ -41,31 +43,44 @@ def matching_passport(user_id):
         user = db.query(User).filter(User.id == user_id).first()
         
         if user.duty_free_type == DutyFreeType.SHILLA:
-            # 신라 면세점용 처리
-            from app.services.shilla_matching import fetch_shilla_results
-            matched_list, unmatched = fetch_shilla_results(user_id)
+            # 신라 면세점용 처리 - 수정된 로직 사용 (영수증 ID 포함)
+            from app.services.shilla_matching import fetch_shilla_results_with_receipt_ids
+            matched_list, unmatched = fetch_shilla_results_with_receipt_ids(user_id)
             
-            print(f"사용자 {user_id}의 신라 matched 정보: {matched_list}")
+            print(f"사용자 {user_id}의 신라 매칭 정보:")
             print("=== 신라 매칭된 영수증과 여권 정보 ===")
             
-            # matched_list를 passport_info 형태로 변환
+            # matched_list를 passport_info 형태로 변환 (수정된 로직)
             passport_info = []
             for customer in matched_list:
+                # 여권 풀네임이 있으면 사용, 없으면 엑셀 성씨 사용
+                display_name = customer.get('passport_name') or customer.get('name') or customer.get('excel_name')
+                
                 info = {
-                    "name": customer['name'],
+                    "name": display_name,  # 여권 풀네임 우선
+                    "excel_name": customer.get('excel_name'),  # 엑셀 성씨
+                    "passport_name": customer.get('passport_name'),  # 여권 풀네임
                     "receipt_numbers": customer['receipt_numbers'],
+                    "receipt_ids": customer.get('receipt_ids', []),  # 영수증 ID 목록 추가
+                    "receipt_id_mapping": customer.get('receipt_id_mapping', {}),  # 영수증 번호 -> ID 매핑
                     "passport_number": customer.get('passport_number'),
                     "birthday": customer.get('birthday'),
-                    "needs_update": customer.get('needs_update', False)
+                    "needs_update": customer.get('needs_update', False),
+                    "passport_match_status": customer.get('passport_match_status', '확인 필요'),
+                    "passport_status": customer.get('passport_status', 'unknown')
                 }
                 passport_info.append(info)
                 
                 # 로그 출력
-                print(f"이름: {customer['name']}")
-                print(f"여권번호: {customer.get('passport_number', '없음')}")
-                print(f"생년월일: {customer.get('birthday', '없음')}")
-                print(f"영수증 번호들: {', '.join(customer['receipt_numbers'])}")
-                print(f"매칭 상태: {'여권 정보 수정 필요' if customer.get('needs_update') else '매칭됨'}")
+                print(f"고객명: {display_name}")
+                if customer.get('passport_name') and customer.get('excel_name'):
+                    print(f"  - 여권 풀네임: {customer['passport_name']}")
+                    print(f"  - 엑셀 성씨: {customer['excel_name']}")
+                print(f"  - 여권번호: {customer.get('passport_number', '없음')}")
+                print(f"  - 생년월일: {customer.get('birthday', '없음')}")
+                print(f"  - 영수증 번호들: {', '.join(customer['receipt_numbers'])}")
+                print(f"  - 영수증 ID들: {', '.join(map(str, customer.get('receipt_ids', [])))}")
+                print(f"  - 매칭 상태: {customer.get('passport_match_status', '확인 필요')}")
                 print("-" * 50)
                 
             print("\n=== 매칭되지 않은 영수증 ===")
@@ -77,7 +92,7 @@ def matching_passport(user_id):
         else:
             # 기존 롯데 로직
             matched, unmatched = fetch_results(user_id)
-            print(f"사용자 {user_id}의 matched 정보: {matched}")
+            print(f"사용자 {user_id}의 롯데 매칭 정보: {matched}")
             print("=== 매칭된 영수증과 여권 정보 ===")
             
             passport_info = []
@@ -140,23 +155,19 @@ def get_unmatched_passports(user_id):
             LEFT JOIN lotte_excel_data e ON p.name = e.name
             WHERE e.name IS NULL AND p.user_id = :user_id;
             """
-        else:
-            # 신라: passport 테이블의 이름이 shilla_excel_data에 없는 경우 찾기
-            sql = """
-            SELECT p.name as passport_name, p.passport_number, p.birthday, p.file_path
-            FROM passports p
-            LEFT JOIN shilla_excel_data e ON p.name = e.name
-            WHERE e.name IS NULL AND p.user_id = :user_id;
-            """
+            unmatched = db.execute(text(sql), {"user_id": user_id}).fetchall()
             
-        unmatched = db.execute(text(sql), {"user_id": user_id}).fetchall()
-        
-        return [{
-            "passport_name": row[0],
-            "passport_number": row[1],
-            "birthday": row[2],
-            "file_path": row[3]
-        } for row in unmatched]
+            return [{
+                "passport_name": row[0],
+                "passport_number": row[1],
+                "birthday": row[2],
+                "file_path": row[3]
+            } for row in unmatched]
+        else:
+            # 신라: 수정된 로직 사용 (result.html과 동일한 로직)
+            from app.services.shilla_matching import get_shilla_unmatched_passports
+            return get_shilla_unmatched_passports(user_id)
+
 
 def update_passport_matching_status(passport_name: str, is_matched: bool, user_id: int):
     """

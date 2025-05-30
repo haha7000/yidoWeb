@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>신라 영수증 여권번호 수정</h2>
+        <span class="badge bg-info">사용자: {{ user.username }}</span>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">영수증 이미지</h5>
+                    <div class="image-container">
+                        {% if receipt.file_path %}
+                        <img class="receipt-image" id="receipt-image" 
+                             src="/{{ receipt.file_path }}" 
+                             alt="Receipt Image" 
+                             style="width: 100%; cursor: grab;">
+                        {% else %}
+                        <div class="text-center p-5 text-muted">
+                            <i class="fas fa-receipt fa-3x mb-3"></i>
+                            <p>이미지를 찾을 수 없습니다</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="zoom-controls text-center">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="zoomIn()">
+                            <i class="fas fa-search-plus"></i> 확대
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="zoomOut()">
+                            <i class="fas fa-search-minus"></i> 축소
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetZoom()">
+                            <i class="fas fa-undo"></i> 초기화
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">여권번호 수정</h5>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>현재 영수증 정보:</strong><br>
+                        영수증 번호: <code>{{ receipt.receipt_number }}</code><br>
+                        현재 여권번호: <strong>{{ receipt.passport_number or '없음' }}</strong><br>
+                        고객명: <strong>{{ excel_name or '알 수 없음' }}</strong>
+                    </div>
+                    
+                    {% if passport_info %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>매칭되지 않은 여권 정보:</strong><br>
+                        여권 풀네임: <strong>{{ passport_info.name or '없음' }}</strong><br>
+                        여권번호: <strong>{{ passport_info.passport_number or '없음' }}</strong><br>
+                        생년월일: <strong>{{ passport_info.birthday or '없음' }}</strong>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- 에러 메시지 표시 영역 -->
+                    <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+                    
+                    <form id="update-receipt-form" method="POST" action="/edit_shilla_receipt/{{ receipt.id }}">
+                        <div class="mb-3">
+                            <label for="new_passport_number" class="form-label">새 여권번호 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="new_passport_number" 
+                                   name="new_passport_number" value="{{ receipt.passport_number or '' }}" 
+                                   required placeholder="정확한 여권번호를 입력하세요 (예: AS1234567)">
+                            <div class="form-text">
+                                여권번호는 9자리 (영문 1-2글자 + 숫자 7-8글자) 형식입니다.<br>
+                                여권 테이블의 여권번호와 일치해야 합니다.
+                            </div>
+                        </div>
+                        
+                        <!-- 매칭 가능한 여권 목록 표시 -->
+                        {% if available_passports %}
+                        <div class="mb-3">
+                            <label class="form-label">매칭 가능한 여권 목록</label>
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <small class="text-muted">아래 여권 중 하나를 선택하여 입력하세요:</small>
+                                    {% for passport in available_passports %}
+                                    <div class="border rounded p-2 mt-2 passport-option" 
+                                         onclick="selectPassport('{{ passport.passport_number }}', '{{ passport.name }}', '{{ passport.birthday }}')"
+                                         style="cursor: pointer; transition: all 0.2s;">
+                                        <strong>{{ passport.name }}</strong><br>
+                                        <small>여권번호: <code>{{ passport.passport_number }}</code></small><br>
+                                        <small>생년월일: {{ passport.birthday or '없음' }}</small>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-check"></i> 여권번호 저장 및 매칭
+                            </button>
+                            <a href="/result/" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> 결과 페이지로 돌아가기
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.passport-option:hover {
+    background-color: #e9ecef !important;
+    border-color: #007bff !important;
+}
+
+.passport-option.selected {
+    background-color: #d4edda !important;
+    border-color: #28a745 !important;
+}
+</style>
+
+<script>
+    // 여권 선택 함수
+    function selectPassport(passportNumber, name, birthday) {
+        document.getElementById('new_passport_number').value = passportNumber;
+        
+        // 모든 옵션에서 selected 클래스 제거
+        document.querySelectorAll('.passport-option').forEach(option => {
+            option.classList.remove('selected');
+        });
+        
+        // 선택된 옵션에 selected 클래스 추가
+        event.target.classList.add('selected');
+        
+        // 성공 메시지 표시
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-success alert-dismissible fade show mt-2';
+        alertDiv.innerHTML = `
+            <i class="fas fa-check"></i> 선택됨: <strong>${name}</strong> (${passportNumber})
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        // 기존 알림 제거
+        const existingAlert = document.querySelector('.alert-success');
+        if (existingAlert) {
+            existingAlert.remove();
+        }
+        
+        // 새 알림 추가
+        document.getElementById('update-receipt-form').appendChild(alertDiv);
+        
+        // 3초 후 자동 제거
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 3000);
+    }
+
+    // 폼 제출 처리
+    document.getElementById('update-receipt-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        clearError();
+
+        const passportInput = document.querySelector('input[name="new_passport_number"]');
+        const newPassportNumber = passportInput.value.trim();
+        
+        if (!newPassportNumber) {
+            showError('여권번호를 입력해주세요.');
+            passportInput.classList.add('input-error');
+            return;
+        }
+
+        // 여권번호 형식 검증 (간단한 검증)
+        const passportRegex = /^[A-Z]{1,2}\d{7,8}$/;
+        if (!passportRegex.test(newPassportNumber)) {
+            showError('올바른 여권번호 형식이 아닙니다. (예: AS1234567)');
+            passportInput.classList.add('input-error');
+            return;
+        }
+
+        passportInput.classList.remove('input-error');
+        
+        const formData = new FormData(this);
+        
+        try {
+            const response = await fetch(this.action, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                // 성공 시 결과 페이지로 리다이렉트
+                window.location.href = '/result/';
+            } else {
+                // 오류 처리
+                const contentType = response.headers.get('Content-Type');
+                let errorMessage = '오류가 발생했습니다.';
+                
+                if (contentType && contentType.includes('application/json')) {
+                    const result = await response.json();
+                    errorMessage = result.error || result.detail || errorMessage;
+                } else {
+                    errorMessage = `서버 오류 (${response.status})`;
+                }
+                
+                showError(errorMessage);
+                passportInput.classList.add('input-error');
+            }
+        } catch (error) {
+            console.error('Error updating receipt passport number:', error);
+            showError('네트워크 오류가 발생했습니다.');
+            passportInput.classList.add('input-error');
+        }
+    });
+</script>
+{% endblock %}

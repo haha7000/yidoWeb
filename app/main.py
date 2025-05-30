@@ -95,7 +95,7 @@ async def register_user(
         db.commit()
         db.refresh(user)
         
-        return templates.TemplateResponse("register.html", {
+        return templates.TemplateResponse("login.html", {
             "request": request,
             "success": "회원가입이 완료되었습니다. 로그인해주세요."
         })
@@ -899,3 +899,161 @@ async def unmatched_passports(
                 "user": current_user
             }
         )
+    
+@app.get("/edit_shilla_receipt/{receipt_id}")
+async def edit_shilla_receipt(
+    request: Request, 
+    receipt_id: int,
+    current_user: User = Depends(get_current_user)
+):
+    """신라 영수증의 여권번호 수정 페이지"""
+    db = SessionLocal()
+    try:
+        # 신라 영수증 조회
+        receipt = db.query(ShillaReceipt).filter(
+            ShillaReceipt.id == receipt_id,
+            ShillaReceipt.user_id == current_user.id
+        ).first()
+        
+        if not receipt:
+            raise HTTPException(status_code=404, detail="영수증을 찾을 수 없습니다.")
+        
+        # 해당 영수증과 매칭된 엑셀 데이터의 고객명 조회
+        excel_name = None
+        try:
+            excel_sql = text("""
+                SELECT name 
+                FROM shilla_excel_data 
+                WHERE "receiptNumber"::text = :receipt_number
+            """)
+            excel_result = db.execute(excel_sql, {"receipt_number": receipt.receipt_number}).first()
+            if excel_result:
+                excel_name = excel_result[0]
+        except Exception as e:
+            print(f"엑셀 데이터 조회 오류: {e}")
+        
+        # 현재 여권번호로 여권 정보 조회 (있다면)
+        passport_info = None
+        if receipt.passport_number:
+            passport_info = db.query(Passport).filter(
+                Passport.passport_number == receipt.passport_number,
+                Passport.user_id == current_user.id
+            ).first()
+        
+        # 매칭 가능한 여권 목록 조회 (매칭되지 않은 여권들)
+        available_passports_sql = text("""
+            SELECT DISTINCT p.name, p.passport_number, p.birthday
+            FROM passports p
+            WHERE p.user_id = :user_id
+            AND (
+                p.is_matched = FALSE 
+                OR p.passport_number NOT IN (
+                    SELECT DISTINCT se.passport_number 
+                    FROM shilla_excel_data se 
+                    WHERE se.passport_number IS NOT NULL
+                )
+            )
+            ORDER BY p.name
+        """)
+        available_passports = db.execute(available_passports_sql, {"user_id": current_user.id}).fetchall()
+        
+        return templates.TemplateResponse(
+            "edit_shilla_receipt.html",
+            {
+                "request": request,
+                "receipt": receipt,
+                "excel_name": excel_name,
+                "passport_info": passport_info,
+                "available_passports": available_passports,
+                "user": current_user
+            }
+        )
+    finally:
+        db.close()
+
+
+@app.post("/edit_shilla_receipt/{receipt_id}")
+async def update_shilla_receipt(
+    receipt_id: int, 
+    new_passport_number: str = Form(...),
+    current_user: User = Depends(get_current_user)
+):
+    """신라 영수증의 여권번호 업데이트"""
+    db = SessionLocal()
+    try:
+        # 신라 영수증 조회 및 업데이트
+        receipt = db.query(ShillaReceipt).filter(
+            ShillaReceipt.id == receipt_id,
+            ShillaReceipt.user_id == current_user.id
+        ).first()
+        
+        if not receipt:
+            raise HTTPException(status_code=404, detail="영수증을 찾을 수 없습니다.")
+        
+        old_passport_number = receipt.passport_number
+        receipt.passport_number = new_passport_number
+        
+        # 새로운 여권번호로 여권 테이블에서 매칭 확인
+        passport = db.query(Passport).filter(
+            Passport.passport_number == new_passport_number,
+            Passport.user_id == current_user.id
+        ).first()
+        
+        if not passport:
+            db.rollback()
+            raise HTTPException(status_code=400, detail="입력한 여권번호와 일치하는 여권 정보가 없습니다.")
+        
+        # shilla_excel_data 테이블의 passport_number 업데이트
+        try:
+            update_excel_sql = text("""
+                UPDATE shilla_excel_data 
+                SET passport_number = :new_passport_number
+                WHERE "receiptNumber"::text = :receipt_number
+            """)
+            db.execute(update_excel_sql, {
+                "new_passport_number": new_passport_number,
+                "receipt_number": receipt.receipt_number
+            })
+            print(f"신라 엑셀 데이터 여권번호 업데이트: {receipt.receipt_number} -> {new_passport_number}")
+        except Exception as e:
+            print(f"엑셀 데이터 업데이트 오류: {e}")
+        
+        # 여권의 매칭 상태 업데이트
+        passport.is_matched = True
+        
+        # 이전 여권이 있었다면 매칭 해제
+        if old_passport_number and old_passport_number != new_passport_number:
+            old_passport = db.query(Passport).filter(
+                Passport.passport_number == old_passport_number,
+                Passport.user_id == current_user.id
+            ).first()
+            if old_passport:
+                old_passport.is_matched = False
+        
+        # 매칭 로그 업데이트
+        match_log = db.query(ReceiptMatchLog).filter(
+            ReceiptMatchLog.receipt_number == receipt.receipt_number,
+            ReceiptMatchLog.user_id == current_user.id
+        ).first()
+        
+        if match_log:
+            match_log.passport_number = new_passport_number
+            match_log.birthday = passport.birthday
+        
+        db.commit()
+        print(f"신라 영수증 여권번호 업데이트 완료: {receipt.receipt_number} -> {new_passport_number}")
+        
+        return RedirectResponse(
+            url="/result/",
+            status_code=303
+        )
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"신라 영수증 업데이트 오류: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"업데이트 중 오류가 발생했습니다: {str(e)}")
+    finally:
+        db.close()

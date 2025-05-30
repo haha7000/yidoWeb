@@ -124,18 +124,66 @@
                                         data-bs-toggle="collapse" data-bs-target="#customer{{ loop.index }}"
                                         aria-expanded="false" aria-controls="customer{{ loop.index }}">
                                     <i class="fas fa-user me-2"></i>
-                                    {{ customer.name }}
+                                    <!-- 신라 면세점: 여권 풀네임 우선 표시 -->
+                                    {% if duty_free_type == "shilla" %}
+                                        {% if customer.get('passport_name') %}
+                                            <strong>{{ customer.passport_name }}</strong>
+                                            {% if customer.get('excel_name') and customer.passport_name != customer.excel_name %}
+                                                <small class="text-muted ms-1">(엑셀: {{ customer.excel_name }})</small>
+                                            {% endif %}
+                                        {% else %}
+                                            {{ customer.name }}
+                                            <small class="text-muted ms-1">(엑셀명만)</small>
+                                        {% endif %}
+                                    {% else %}
+                                        {{ customer.name }}
+                                    {% endif %}
+                                    
                                     <span class="badge bg-primary ms-2">{{ customer.receipt_numbers|length }}건</span>
-                                    {% if customer.needs_update %}
-                                    <span class="badge bg-warning text-dark ms-2">
-                                        <i class="fas fa-exclamation-triangle"></i> 여권 수정 필요
-                                    </span>
+                                    
+                                    <!-- 신라 면세점용 여권 상태 표시 -->
+                                    {% if duty_free_type == "shilla" %}
+                                        {% if customer.get('passport_match_status') == '여권번호 수정 필요' %}
+                                        <span class="badge bg-warning text-dark ms-2">
+                                            <i class="fas fa-exclamation-triangle"></i> 여권번호 수정 필요
+                                        </span>
+                                        {% elif customer.get('passport_match_status') == '매칭됨' %}
+                                        <span class="badge bg-success ms-2">
+                                            <i class="fas fa-check"></i> 여권 매칭됨
+                                        </span>
+                                        {% elif customer.get('passport_match_status') == '여권 정보 없음' %}
+                                        <span class="badge bg-danger ms-2">
+                                            <i class="fas fa-times"></i> 여권 정보 없음
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-secondary ms-2">
+                                            <i class="fas fa-question"></i> {{ customer.get('passport_match_status', '확인 필요') }}
+                                        </span>
+                                        {% endif %}
+                                    {% else %}
+                                        <!-- 롯데 면세점용 기존 로직 -->
+                                        {% if customer.needs_update %}
+                                        <span class="badge bg-warning text-dark ms-2">
+                                            <i class="fas fa-exclamation-triangle"></i> 여권 수정 필요
+                                        </span>
+                                        {% endif %}
                                     {% endif %}
                                 </button>
                             </h2>
                             <div id="customer{{ loop.index }}" class="accordion-collapse collapse"
                                  data-bs-parent="#customerAccordion">
                                 <div class="accordion-body">
+                                    <!-- 신라 면세점용 추가 정보 표시 -->
+                                    {% if duty_free_type == "shilla" and customer.get('passport_name') and customer.get('excel_name') %}
+                                    <div class="alert alert-info mb-3">
+                                        <strong><i class="fas fa-info-circle"></i> 매칭 정보:</strong><br>
+                                        <small>
+                                            여권 풀네임: <strong>{{ customer.passport_name }}</strong><br>
+                                            엑셀 성씨: <strong>{{ customer.excel_name }}</strong>
+                                        </small>
+                                    </div>
+                                    {% endif %}
+                                    
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover">
                                             <thead>
@@ -153,15 +201,69 @@
                                                     <td>{{ customer.passport_number or '<small class="text-muted">없음</small>' | safe }}</td>
                                                     <td>{{ customer.birthday or '<small class="text-muted">없음</small>' | safe }}</td>
                                                     <td>
-                                                        {% if customer.needs_update %}
-                                                        <a href="/edit_passport/{{ customer.name }}" 
-                                                           class="btn btn-warning btn-sm">
-                                                            <i class="fas fa-edit"></i> 수정
-                                                        </a>
+                                                        {% if duty_free_type == "shilla" %}
+                                                            <!-- 신라 면세점용 작업 버튼 -->
+                                                            {% set receipt_id = customer.get('receipt_id_mapping', {}).get(receipt_number) %}
+                                                            
+                                                            {% if customer.get('passport_match_status') == '여권번호 수정 필요' %}
+                                                            <div class="btn-group" role="group">
+                                                                {% if receipt_id %}
+                                                                <a href="/edit_shilla_receipt/{{ receipt_id }}" 
+                                                                   class="btn btn-info btn-sm" title="영수증의 여권번호 수정">
+                                                                    <i class="fas fa-receipt"></i> 영수증 수정
+                                                                </a>
+                                                                {% endif %}
+                                                                <a href="/edit_passport/{{ customer.get('passport_name') or customer.name }}" 
+                                                                   class="btn btn-warning btn-sm" title="여권 정보 수정">
+                                                                    <i class="fas fa-edit"></i> 여권 수정
+                                                                </a>
+                                                            </div>
+                                                            
+                                                            {% elif customer.get('passport_match_status') == '여권 정보 없음' %}
+                                                            <div class="btn-group" role="group">
+                                                                {% if receipt_id %}
+                                                                <a href="/edit_shilla_receipt/{{ receipt_id }}" 
+                                                                   class="btn btn-info btn-sm" title="영수증의 여권번호 수정">
+                                                                    <i class="fas fa-receipt"></i> 영수증 수정
+                                                                </a>
+                                                                {% endif %}
+                                                                <a href="/edit_passport/{{ customer.get('passport_name') or customer.name }}" 
+                                                                   class="btn btn-danger btn-sm" title="여권 정보 추가">
+                                                                    <i class="fas fa-plus"></i> 여권 추가
+                                                                </a>
+                                                            </div>
+                                                            
+                                                            {% elif customer.get('passport_match_status') == '확인 필요' %}
+                                                            <div class="btn-group" role="group">
+                                                                {% if receipt_id %}
+                                                                <a href="/edit_shilla_receipt/{{ receipt_id }}" 
+                                                                   class="btn btn-info btn-sm" title="영수증의 여권번호 수정">
+                                                                    <i class="fas fa-receipt"></i> 영수증 수정
+                                                                </a>
+                                                                {% endif %}
+                                                                <a href="/edit_passport/{{ customer.get('passport_name') or customer.name }}" 
+                                                                   class="btn btn-warning btn-sm" title="여권 정보 수정">
+                                                                    <i class="fas fa-edit"></i> 여권 수정
+                                                                </a>
+                                                            </div>
+                                                            
+                                                            {% else %}
+                                                            <span class="badge bg-success">
+                                                                <i class="fas fa-check"></i> 완료
+                                                            </span>
+                                                            {% endif %}
                                                         {% else %}
-                                                        <span class="badge bg-success">
-                                                            <i class="fas fa-check"></i> 완료
-                                                        </span>
+                                                            <!-- 롯데 면세점용 기존 로직 -->
+                                                            {% if customer.needs_update %}
+                                                            <a href="/edit_passport/{{ customer.name }}" 
+                                                               class="btn btn-warning btn-sm">
+                                                                <i class="fas fa-edit"></i> 수정
+                                                            </a>
+                                                            {% else %}
+                                                            <span class="badge bg-success">
+                                                                <i class="fas fa-check"></i> 완료
+                                                            </span>
+                                                            {% endif %}
                                                         {% endif %}
                                                     </td>
                                                 </tr>
@@ -386,6 +488,25 @@ code {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* 신라 면세점 추가 정보 스타일 */
+.accordion-button strong {
+    color: #0d6efd;
+}
+
+.accordion-button small.text-muted {
+    font-weight: normal;
+}
+
+/* 버튼 그룹 스타일 */
+.btn-group .btn {
+    font-size: 0.8em;
+    padding: 4px 8px;
+}
+
+.btn-group .btn:first-child {
+    margin-right: 2px;
 }
 </style>
 
