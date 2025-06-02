@@ -3,7 +3,13 @@
 {% block content %}
 <div class="container mt-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>영수증 정보 수정</h2>
+        <h2>
+            {% if duty_free_type == "shilla" %}
+            신라 영수증 정보 수정
+            {% else %}
+            영수증 정보 수정
+            {% endif %}
+        </h2>
         <span class="badge bg-info">사용자: {{ user.username }}</span>
     </div>
     
@@ -43,56 +49,281 @@
         <div class="col-md-6">
             <div class="card">
                 <div class="card-body">
-                    <h5 class="card-title">영수증 번호 수정</h5>
+                    <h5 class="card-title">
+                        {% if duty_free_type == "shilla" %}
+                        영수증 및 여권 정보 수정
+                        {% else %}
+                        영수증 번호 수정
+                        {% endif %}
+                    </h5>
                     
+                    {% if duty_free_type == "shilla" %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>현재 영수증 정보:</strong><br>
+                        영수증 번호: <code>{{ receipt.receipt_number or '없음' }}</code><br>
+                        여권번호: <strong>{{ receipt.passport_number or '없음' }}</strong>
+                    </div>
+                    {% else %}
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle"></i>
                         <strong>현재 영수증 번호:</strong> {{ receipt.receipt_number or '없음' }}
                     </div>
+                    {% endif %}
                     
-                    <!-- 에러 메시지 표시 영역 -->
+                    <!-- 에러/성공 메시지 표시 영역 -->
                     <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+                    <div id="success-message" class="alert alert-success" style="display: none;"></div>
                     
                     <form id="update-form" method="POST" action="/edit_unmatched/{{ receipt.id }}">
                         <div class="mb-3">
-                            <label for="new_receipt_number" class="form-label">새 영수증 번호 <span class="text-danger">*</span></label>
+                            <label for="new_receipt_number" class="form-label">
+                                영수증 번호 <span class="text-danger">*</span>
+                            </label>
                             <input type="text" class="form-control" id="new_receipt_number" 
                                    name="new_receipt_number" value="{{ receipt.receipt_number or '' }}" 
                                    required placeholder="정확한 영수증 번호를 입력하세요">
-                            <div class="form-text">엑셀 데이터에 있는 영수증 번호와 정확히 일치해야 합니다.</div>
+                            <div class="form-text">
+                                {% if duty_free_type == "shilla" %}
+                                신라 면세점 영수증 번호 (13자리 숫자)
+                                {% else %}
+                                롯데 면세점 영수증 번호 (14자리 숫자)
+                                {% endif %}
+                            </div>
                         </div>
+                        
+                        {% if duty_free_type == "shilla" %}
+                        <div class="mb-3">
+                            <label for="passport_number" class="form-label">
+                                여권번호 
+                                <small class="text-muted">(선택사항)</small>
+                            </label>
+                            <input type="text" class="form-control" id="passport_number" 
+                                   name="passport_number" value="{{ receipt.passport_number or '' }}" 
+                                   placeholder="여권번호 입력 (예: AS1234567)">
+                            <div class="form-text">
+                                여권번호는 9자리 (영문 1-2글자 + 숫자 7-8글자) 형식입니다.<br>
+                                영수증에서 여권번호가 인식되지 않았거나 잘못 인식된 경우 수정하세요.
+                            </div>
+                        </div>
+                        
+                        <!-- 매칭 가능한 여권 목록 표시 -->
+                        <div class="mb-3" id="passport-suggestions" style="display: none;">
+                            <label class="form-label">매칭 가능한 여권 목록</label>
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <small class="text-muted">아래 여권 중 하나를 선택하여 입력하세요:</small>
+                                    <div id="passport-list"></div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                         
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-success">
-                                <i class="fas fa-check"></i> 저장 및 매칭 확인
+                                <i class="fas fa-check"></i> 
+                                {% if duty_free_type == "shilla" %}
+                                저장 및 매칭 확인
+                                {% else %}
+                                저장 및 매칭 확인
+                                {% endif %}
                             </button>
                             <a href="/result/" class="btn btn-outline-secondary">
                                 <i class="fas fa-arrow-left"></i> 결과 페이지로 돌아가기
                             </a>
                         </div>
                     </form>
+                    
+                    {% if duty_free_type == "shilla" %}
+                    <!-- 신라 전용 도움말 -->
+                    <div class="mt-4">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="fas fa-lightbulb text-warning"></i> 도움말
+                                </h6>
+                                <ul class="mb-0 small">
+                                    <li>영수증 번호만 수정하면 엑셀 데이터와 매칭됩니다</li>
+                                    <li>여권번호도 함께 수정하면 여권 정보와 연결됩니다</li>
+                                    <li>여권번호가 정확하지 않으면 나중에 개별 수정 가능합니다</li>
+                                    <li>엑셀 데이터에 없는 영수증 번호는 매칭되지 않습니다</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<style>
+.passport-option {
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 10px;
+    margin-top: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.passport-option:hover {
+    background-color: #e9ecef;
+    border-color: #007bff;
+}
+
+.passport-option.selected {
+    background-color: #d4edda;
+    border-color: #28a745;
+}
+
+.input-error {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+}
+
+.input-success {
+    border-color: #28a745 !important;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25) !important;
+}
+</style>
+
 <script>
-    // 폼 제출 처리
+document.addEventListener('DOMContentLoaded', function() {
+    const dutyFreeType = "{{ duty_free_type }}";
+    
+    // 신라 면세점인 경우에만 여권 관련 기능 활성화
+    if (dutyFreeType === "shilla") {
+        loadAvailablePassports();
+        setupPassportValidation();
+    }
+    
+    setupFormSubmission();
+});
+
+// 매칭 가능한 여권 목록 로드
+async function loadAvailablePassports() {
+    try {
+        const response = await fetch('/api/available-passports/');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.passports && data.passports.length > 0) {
+                displayPassportSuggestions(data.passports);
+            }
+        } else {
+            console.error('여권 목록 로드 실패:', response.status);
+        }
+    } catch (error) {
+        console.error('여권 목록 로드 오류:', error);
+    }
+}
+
+// 여권 제안 목록 표시
+function displayPassportSuggestions(passports) {
+    const suggestionsDiv = document.getElementById('passport-suggestions');
+    const passportList = document.getElementById('passport-list');
+    
+    passportList.innerHTML = '';
+    
+    passports.forEach(passport => {
+        const div = document.createElement('div');
+        div.className = 'passport-option';
+        div.innerHTML = `
+            <strong>${passport.name}</strong><br>
+            <small>여권번호: <code>${passport.passport_number}</code></small><br>
+            <small>생년월일: ${passport.birthday}</small>
+        `;
+        
+        div.addEventListener('click', function() {
+            selectPassport(passport.passport_number, passport.name);
+        });
+        
+        passportList.appendChild(div);
+    });
+    
+    suggestionsDiv.style.display = 'block';
+}
+
+// 여권 선택 함수
+function selectPassport(passportNumber, name) {
+    document.getElementById('passport_number').value = passportNumber;
+    
+    // 모든 옵션에서 selected 클래스 제거
+    document.querySelectorAll('.passport-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    // 선택된 옵션에 selected 클래스 추가
+    event.target.classList.add('selected');
+    
+    // 성공 메시지 표시
+    showSuccess(`선택됨: ${name} (${passportNumber})`);
+    
+    // 입력 필드 스타일 업데이트
+    document.getElementById('passport_number').classList.remove('input-error');
+    document.getElementById('passport_number').classList.add('input-success');
+}
+
+// 여권번호 유효성 검사 설정
+function setupPassportValidation() {
+    const passportInput = document.getElementById('passport_number');
+    
+    passportInput.addEventListener('input', function() {
+        const value = this.value.trim();
+        
+        if (value === '') {
+            // 빈 값은 허용 (선택사항이므로)
+            this.classList.remove('input-error', 'input-success');
+            return;
+        }
+        
+        // 여권번호 형식 검증 (간단한 검증)
+        const passportRegex = /^[A-Z]{1,2}\d{7,8}$/;
+        if (passportRegex.test(value)) {
+            this.classList.remove('input-error');
+            this.classList.add('input-success');
+            clearError();
+        } else {
+            this.classList.remove('input-success');
+            this.classList.add('input-error');
+            showError('올바른 여권번호 형식이 아닙니다. (예: AS1234567)');
+        }
+    });
+}
+
+// 폼 제출 처리
+function setupFormSubmission() {
     document.getElementById('update-form').addEventListener('submit', async function(e) {
         e.preventDefault();
         clearError();
+        clearSuccess();
 
         const receiptInput = document.querySelector('input[name="new_receipt_number"]');
-        const newValue = receiptInput.value.trim();
+        const passportInput = document.querySelector('input[name="passport_number"]');
         
-        if (!newValue) {
+        const receiptNumber = receiptInput.value.trim();
+        const passportNumber = passportInput ? passportInput.value.trim() : '';
+        
+        // 영수증 번호 유효성 검사
+        if (!receiptNumber) {
             showError('영수증 번호를 입력해주세요.');
             receiptInput.classList.add('input-error');
             return;
         }
 
+        // 신라 면세점인 경우 여권번호 추가 검증
+        if ("{{ duty_free_type }}" === "shilla" && passportNumber) {
+            const passportRegex = /^[A-Z]{1,2}\d{7,8}$/;
+            if (!passportRegex.test(passportNumber)) {
+                showError('올바른 여권번호 형식이 아닙니다. (예: AS1234567)');
+                passportInput.classList.add('input-error');
+                return;
+            }
+        }
+
         receiptInput.classList.remove('input-error');
+        if (passportInput) passportInput.classList.remove('input-error');
         
         const formData = new FormData(this);
         
@@ -104,7 +335,10 @@
             
             if (response.ok) {
                 // 성공 시 결과 페이지로 리다이렉트
-                window.location.href = '/result/';
+                showSuccess('저장 완료! 결과 페이지로 이동합니다...');
+                setTimeout(() => {
+                    window.location.href = '/result/';
+                }, 1500);
             } else {
                 // 오류 처리
                 const contentType = response.headers.get('Content-Type');
@@ -126,5 +360,42 @@
             receiptInput.classList.add('input-error');
         }
     });
+}
+
+// 에러 메시지 표시
+function showError(message) {
+    const errorDiv = document.getElementById('error-message');
+    if (errorDiv) {
+        errorDiv.style.display = 'block';
+        errorDiv.textContent = message;
+    }
+}
+
+// 에러 메시지 숨김
+function clearError() {
+    const errorDiv = document.getElementById('error-message');
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+        errorDiv.textContent = '';
+    }
+}
+
+// 성공 메시지 표시
+function showSuccess(message) {
+    const successDiv = document.getElementById('success-message');
+    if (successDiv) {
+        successDiv.style.display = 'block';
+        successDiv.textContent = message;
+    }
+}
+
+// 성공 메시지 숨김
+function clearSuccess() {
+    const successDiv = document.getElementById('success-message');
+    if (successDiv) {
+        successDiv.style.display = 'none';
+        successDiv.textContent = '';
+    }
+}
 </script>
 {% endblock %}

@@ -611,30 +611,64 @@ async def edit_unmatched(
 ):
     db = SessionLocal()
     try:
+        # 사용자의 면세점 타입에 따라 다른 테이블 조회
         if current_user.duty_free_type == DutyFreeType.SHILLA:
             # 신라 면세점용 처리
             receipt = db.query(ShillaReceipt).filter(
                 ShillaReceipt.id == receipt_id,
                 ShillaReceipt.user_id == current_user.id
             ).first()
+            
+            if not receipt:
+                raise HTTPException(status_code=404, detail="영수증을 찾을 수 없습니다.")
+            
+            # 매칭 가능한 여권 목록 조회 (매칭되지 않은 여권들)
+            available_passports_sql = text("""
+                SELECT DISTINCT p.name, p.passport_number, p.birthday
+                FROM passports p
+                WHERE p.user_id = :user_id
+                AND (
+                    p.is_matched = FALSE 
+                    OR p.passport_number NOT IN (
+                        SELECT DISTINCT sr.passport_number 
+                        FROM shilla_receipts sr 
+                        WHERE sr.passport_number IS NOT NULL 
+                        AND sr.user_id = :user_id
+                    )
+                )
+                ORDER BY p.name
+            """)
+            available_passports = db.execute(available_passports_sql, {"user_id": current_user.id}).fetchall()
+            
+            return templates.TemplateResponse(
+                "edit_unmatched.html",
+                {
+                    "request": request,
+                    "receipt": receipt,
+                    "available_passports": available_passports,
+                    "user": current_user,
+                    "duty_free_type": "shilla"
+                }
+            )
         else:
-            # 롯데 면세점용 처리
+            # 롯데 면세점용 처리 (기존 로직)
             receipt = db.query(Receipt).filter(
                 Receipt.id == receipt_id,
                 Receipt.user_id == current_user.id
             ).first()
             
-        if not receipt:
-            raise HTTPException(status_code=404, detail="영수증을 찾을 수 없습니다.")
-        
-        return templates.TemplateResponse(
-            "edit_unmatched.html",
-            {
-                "request": request,
-                "receipt": receipt,
-                "user": current_user
-            }
-        )
+            if not receipt:
+                raise HTTPException(status_code=404, detail="영수증을 찾을 수 없습니다.")
+            
+            return templates.TemplateResponse(
+                "edit_unmatched.html",
+                {
+                    "request": request,
+                    "receipt": receipt,
+                    "user": current_user,
+                    "duty_free_type": "lotte"
+                }
+            )
     finally:
         db.close()
 
@@ -642,59 +676,155 @@ async def edit_unmatched(
 async def update_unmatched(
     receipt_id: int, 
     new_receipt_number: str = Form(...),
+    passport_number: str = Form(""),  # 신라 면세점용 추가 필드
     current_user: User = Depends(get_current_user)
 ):
     db = SessionLocal()
     try:
-        # 사용자의 영수증만 조회 및 업데이트
-        receipt = db.query(Receipt).filter(
-            Receipt.id == receipt_id,
-            Receipt.user_id == current_user.id
-        ).first()
-        if not receipt:
-            raise HTTPException(status_code=404, detail="영수증을 찾을 수 없습니다.")
-        
-        old_receipt_number = receipt.receipt_number
-        receipt.receipt_number = new_receipt_number
-        
-        # 면세점 타입에 따라 다른 테이블에서 검색
-        if current_user.duty_free_type == DutyFreeType.LOTTE:
+        if current_user.duty_free_type == DutyFreeType.SHILLA:
+            # 신라 면세점용 처리
+            receipt = db.query(ShillaReceipt).filter(
+                ShillaReceipt.id == receipt_id,
+                ShillaReceipt.user_id == current_user.id
+            ).first()
+            
+            if not receipt:
+                raise HTTPException(status_code=404, detail="영수증을 찾을 수 없습니다.")
+            
+            old_receipt_number = receipt.receipt_number
+            old_passport_number = receipt.passport_number
+            
+            # 영수증 정보 업데이트
+            receipt.receipt_number = new_receipt_number
+            if passport_number.strip():  # 여권번호가 제공된 경우에만 업데이트
+                receipt.passport_number = passport_number.strip()
+            
+            # 신라 엑셀 데이터에서 영수증 번호 매칭 확인
+            excel_sql = text("""
+                SELECT "receiptNumber", name, "PayBack"
+                FROM shilla_excel_data
+                WHERE "receiptNumber"::text = :receipt_number
+            """)
+            excel_result = db.execute(excel_sql, {"receipt_number": new_receipt_number}).first()
+            
+            # 여권 정보 매칭 (여권번호가 제공된 경우)
+            passport_info = None
+            if passport_number.strip():
+                passport_info = db.query(Passport).filter(
+                    Passport.passport_number == passport_number.strip(),
+                    Passport.user_id == current_user.id
+                ).first()
+                
+                if passport_info:
+                    # 여권 매칭 상태 업데이트
+                    passport_info.is_matched = True
+                    
+                    # 이전 여권이 있었다면 매칭 해제
+                    if old_passport_number and old_passport_number != passport_number.strip():
+                        old_passport = db.query(Passport).filter(
+                            Passport.passport_number == old_passport_number,
+                            Passport.user_id == current_user.id
+                        ).first()
+                        if old_passport:
+                            old_passport.is_matched = False
+            
+            # 매칭 로그 업데이트
+            match_log = db.query(ReceiptMatchLog).filter(
+                ReceiptMatchLog.receipt_number == old_receipt_number,
+                ReceiptMatchLog.user_id == current_user.id
+            ).first()
+            
+            if match_log:
+                # 기존 로그 업데이트
+                match_log.receipt_number = new_receipt_number
+                match_log.is_matched = excel_result is not None
+                match_log.excel_name = excel_result[1] if excel_result else None
+                match_log.passport_number = passport_number.strip() if passport_number.strip() else None
+                match_log.birthday = passport_info.birthday if passport_info else None
+            else:
+                # 새 로그 생성
+                new_match_log = ReceiptMatchLog(
+                    user_id=current_user.id,
+                    receipt_number=new_receipt_number,
+                    is_matched=excel_result is not None,
+                    excel_name=excel_result[1] if excel_result else None,
+                    passport_number=passport_number.strip() if passport_number.strip() else None,
+                    birthday=passport_info.birthday if passport_info else None
+                )
+                db.add(new_match_log)
+            
+            # 신라 엑셀 데이터에 여권번호 업데이트 (매칭된 경우)
+            if excel_result and passport_number.strip():
+                try:
+                    update_excel_sql = text("""
+                        UPDATE shilla_excel_data 
+                        SET passport_number = :passport_number
+                        WHERE "receiptNumber"::text = :receipt_number
+                    """)
+                    db.execute(update_excel_sql, {
+                        "passport_number": passport_number.strip(),
+                        "receipt_number": new_receipt_number
+                    })
+                    print(f"신라 엑셀 데이터 여권번호 업데이트: {new_receipt_number} -> {passport_number}")
+                except Exception as e:
+                    print(f"엑셀 데이터 업데이트 오류: {e}")
+            
+            db.commit()
+            
+            print(f"신라 영수증 업데이트 완료:")
+            print(f"  - 영수증번호: {old_receipt_number} -> {new_receipt_number}")
+            print(f"  - 여권번호: {old_passport_number} -> {passport_number}")
+            print(f"  - 엑셀 매칭: {'성공' if excel_result else '실패'}")
+            
+        else:
+            # 롯데 면세점용 처리 (기존 로직)
+            receipt = db.query(Receipt).filter(
+                Receipt.id == receipt_id,
+                Receipt.user_id == current_user.id
+            ).first()
+            
+            if not receipt:
+                raise HTTPException(status_code=404, detail="영수증을 찾을 수 없습니다.")
+            
+            old_receipt_number = receipt.receipt_number
+            receipt.receipt_number = new_receipt_number
+            
+            # 롯데 엑셀 데이터에서 검색
             sql = text("""
                 SELECT "receiptNumber"
                 FROM lotte_excel_data
                 WHERE "receiptNumber" = :receipt_number
             """)
-        else:
-            sql = text("""
-                SELECT "receiptNumber"
-                FROM shilla_excel_data
-                WHERE "receiptNumber" = :receipt_number
-            """)
+            result = db.execute(sql, {"receipt_number": new_receipt_number}).first()
             
-        result = db.execute(sql, {"receipt_number": new_receipt_number}).first()
-        
-        # 사용자의 매칭 로그 업데이트
-        match_log = db.query(ReceiptMatchLog).filter(
-            ReceiptMatchLog.receipt_number == old_receipt_number,
-            ReceiptMatchLog.user_id == current_user.id
-        ).first()
-        
-        if match_log:
-            match_log.receipt_number = new_receipt_number
-            if result:
-                match_log.is_matched = True
+            # 매칭 로그 업데이트
+            match_log = db.query(ReceiptMatchLog).filter(
+                ReceiptMatchLog.receipt_number == old_receipt_number,
+                ReceiptMatchLog.user_id == current_user.id
+            ).first()
+            
+            if match_log:
+                match_log.receipt_number = new_receipt_number
+                match_log.is_matched = result is not None
             else:
-                match_log.is_matched = False
-        
-        db.commit()
+                new_match_log = ReceiptMatchLog(
+                    user_id=current_user.id,
+                    receipt_number=new_receipt_number,
+                    is_matched=result is not None
+                )
+                db.add(new_match_log)
+            
+            db.commit()
         
         return RedirectResponse(
             url="/result/",
             status_code=303
         )
+        
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"영수증 업데이트 오류: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"업데이트 중 오류가 발생했습니다: {str(e)}")
     finally:
         db.close()
 
@@ -971,7 +1101,6 @@ async def edit_shilla_receipt(
     finally:
         db.close()
 
-
 @app.post("/edit_shilla_receipt/{receipt_id}")
 async def update_shilla_receipt(
     receipt_id: int, 
@@ -1057,3 +1186,54 @@ async def update_shilla_receipt(
         raise HTTPException(status_code=500, detail=f"업데이트 중 오류가 발생했습니다: {str(e)}")
     finally:
         db.close()
+
+
+@app.get("/api/available-passports/")
+async def get_available_passports(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """매칭 가능한 여권 목록을 JSON으로 반환"""
+    try:
+        if current_user.duty_free_type == DutyFreeType.SHILLA:
+            # 신라 면세점용 - 매칭되지 않은 여권들
+            sql = text("""
+                SELECT DISTINCT p.name, p.passport_number, p.birthday
+                FROM passports p
+                WHERE p.user_id = :user_id
+                AND (
+                    p.is_matched = FALSE 
+                    OR p.passport_number NOT IN (
+                        SELECT DISTINCT sr.passport_number 
+                        FROM shilla_receipts sr 
+                        WHERE sr.passport_number IS NOT NULL 
+                        AND sr.user_id = :user_id
+                    )
+                )
+                ORDER BY p.name
+            """)
+        else:
+            # 롯데 면세점용 - 매칭되지 않은 여권들
+            sql = text("""
+                SELECT DISTINCT p.name, p.passport_number, p.birthday
+                FROM passports p
+                LEFT JOIN lotte_excel_data e ON p.name = e.name
+                WHERE p.user_id = :user_id AND e.name IS NULL
+                ORDER BY p.name
+            """)
+        
+        results = db.execute(sql, {"user_id": current_user.id}).fetchall()
+        
+        passports = []
+        for row in results:
+            passports.append({
+                "name": row[0],
+                "passport_number": row[1],
+                "birthday": row[2].strftime('%Y-%m-%d') if row[2] else None
+            })
+        
+        return {"passports": passports}
+        
+    except Exception as e:
+        print(f"매칭 가능한 여권 목록 조회 오류: {e}")
+        raise HTTPException(status_code=500, detail="여권 목록을 가져올 수 없습니다.")
