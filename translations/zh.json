@@ -1,0 +1,266 @@
+{
+  "common": {
+    "buttons": {
+      "save": "保存",
+      "cancel": "取消",
+      "upload": "上传",
+      "download": "下载",
+      "edit": "编辑",
+      "delete": "删除",
+      "search": "搜索",
+      "login": "登录",
+      "logout": "退出",
+      "register": "注册",
+      "back": "返回",
+      "next": "下一步",
+      "previous": "上一步",
+      "submit": "提交",
+      "confirm": "确认",
+      "close": "关闭"
+    },
+    "status": {
+      "loading": "加载中...",
+      "processing": "处理中...",
+      "success": "成功",
+      "error": "错误",
+      "warning": "警告",
+      "info": "信息",
+      "completed": "完成",
+      "pending": "等待中",
+      "failed": "失败"
+    },
+    "navigation": {
+      "home": "首页",
+      "upload": "上传",
+      "results": "结果",
+      "settings": "设置",
+      "help": "帮助"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "登录",
+      "subtitle": "请登录",
+      "username": "用户名",
+      "password": "密码",
+      "remember_me": "保持登录状态",
+      "forgot_password": "忘记密码？",
+      "no_account": "还没有账户？",
+      "login_button": "登录",
+      "login_success": "登录成功",
+      "login_failed": "用户名或密码错误"
+    },
+    "register": {
+      "title": "注册",
+      "username": "用户名",
+      "email": "邮箱",
+      "password": "密码",
+      "confirm_password": "确认密码",
+      "duty_free_type": "选择免税店",
+      "register_button": "注册",
+      "have_account": "已有账户？",
+      "register_success": "注册成功，请登录。",
+      "register_failed": "注册时发生错误",
+      "username_exists": "用户名已存在",
+      "email_exists": "邮箱已存在"
+    },
+    "welcome": "欢迎，{username}"
+  },
+  "duty_free": {
+    "lotte": "乐天免税店",
+    "shilla": "新罗免税店",
+    "select": "选择免税店"
+  },
+  "upload": {
+    "title": "ZIP文件上传",
+    "description": "请上传包含收据和护照图片的ZIP文件",
+    "drag_drop": "将ZIP文件拖拽到此处或点击选择文件",
+    "file_selected": "已选择文件：{filename}",
+    "upload_start": "开始上传和处理",
+    "processing": "处理中：{done}/{total}",
+    "upload_success": "上传完成",
+    "upload_failed": "上传时发生错误",
+    "invalid_file": "只能上传ZIP文件",
+    "no_file": "请选择文件",
+    "help": {
+      "title": "使用方法",
+      "step1": "将收据和护照图片压缩成一个ZIP文件",
+      "step2": "支持格式：JPG、PNG、JPEG",
+      "step3": "自动识别中文和英文文本",
+      "step4": "处理完成后自动生成收据",
+      "excel_first": "请先上传Excel数据！"
+    },
+    "previous_results": "查看之前的处理结果",
+    "excel_upload": "上传Excel数据",
+    "check_status": "检查处理状态",
+    "processing_time": "处理时间取决于图片数量"
+  },
+  "excel": {
+    "title": "Excel数据上传",
+    "description": "请上传销售记录Excel文件",
+    "current_type": "当前选择的免税店：{type}",
+    "drag_drop": "将Excel文件拖拽到此处或点击选择文件",
+    "requirements": {
+      "title": "注意事项",
+      "format": "Excel文件格式：.xlsx或.xls",
+      "columns": "必需列：交换券号码(receiptNumber)、客户名(name)、PayBack",
+      "data_keep": "现有数据将保留，新数据将被添加"
+    },
+    "stats": {
+      "current_data": "当前保存的数据",
+      "total_records": "总记录数",
+      "unique_customers": "客户数"
+    },
+    "upload_success": "上传成功！",
+    "records_added": "添加记录：{count}条",
+    "processing_time": "处理时间：{time}",
+    "upload_failed": "Excel处理时发生错误"
+  },
+  "results": {
+    "title": "OCR处理结果",
+    "stats": {
+      "matched_customers": "匹配客户",
+      "matched_receipts": "匹配收据",
+      "unmatched_receipts": "未匹配收据",
+      "total_receipts": "总收据",
+      "completion_rate": "处理进度"
+    },
+    "matched_section": {
+      "title": "已匹配收据",
+      "count": "{count}人",
+      "receipt_count": "{count}张",
+      "passport_matched": "护照已匹配",
+      "passport_needs_update": "需要修改护照号",
+      "passport_missing": "缺少护照信息",
+      "passport_check_needed": "需要确认",
+      "no_matched": "没有匹配的收据",
+      "upload_or_fix": "请上传收据或修改未匹配的收据"
+    },
+    "unmatched_section": {
+      "title": "未匹配收据",
+      "count": "{count}张",
+      "receipt_number": "收据号码：{number}",
+      "file": "文件：{filename}",
+      "recognition_failed": "识别失败",
+      "all_matched": "所有收据都已匹配！",
+      "no_unmatched": "没有未匹配的收据"
+    },
+    "actions": {
+      "download_receipts": "下载收据",
+      "unmatched_passports": "未匹配护照",
+      "new_processing": "新处理",
+      "edit_receipt": "编辑收据",
+      "edit_passport": "编辑护照",
+      "add_passport": "添加护照",
+      "completed": "完成"
+    },
+    "search_placeholder": "搜索客户姓名或收据号码...",
+    "table": {
+      "receipt_number": "收据号码",
+      "passport_number": "护照号码",
+      "birthday": "生日",
+      "actions": "操作",
+      "customer_name": "客户姓名",
+      "status": "状态",
+      "none": "无"
+    }
+  },
+  "edit": {
+    "receipt": {
+      "title": "收据信息编辑",
+      "shilla_title": "新罗收据信息编辑",
+      "current_info": "当前收据信息：",
+      "receipt_number": "收据号码",
+      "passport_number": "护照号码",
+      "customer_name": "客户姓名",
+      "new_receipt_number": "新收据号码",
+      "receipt_format_lotte": "乐天免税店收据号码（14位数字）",
+      "receipt_format_shilla": "新罗免税店收据号码（13位数字）",
+      "passport_format": "护照号码为9位（1-2个英文字母+7-8个数字）格式",
+      "save_and_match": "保存并确认匹配",
+      "update_success": "保存完成！正在跳转到结果页面...",
+      "update_failed": "更新时发生错误"
+    },
+    "passport": {
+      "title": "护照信息编辑",
+      "current_info": "当前护照信息：",
+      "name": "姓名",
+      "passport_number": "护照号码",
+      "birthday": "生日",
+      "name_required": "请输入准确的姓名",
+      "excel_match_note": "必须与Excel数据中的姓名完全一致",
+      "passport_optional": "护照号码输入（可选）",
+      "update_failed": "护照信息更新时发生错误"
+    },
+    "available_passports": "可匹配护照列表",
+    "select_passport": "请从下方护照中选择一个输入：",
+    "selected": "已选择：{name}（{number}）",
+    "validation": {
+      "required_field": "必填项",
+      "invalid_format": "格式不正确",
+      "passport_format_error": "护照号码格式不正确。（例：AS1234567）",
+      "correct_format": "格式正确"
+    }
+  },
+  "unmatched_passports": {
+    "title": "未匹配护照列表",
+    "count": "需要匹配的护照列表（{count}个）",
+    "table": {
+      "passport_name": "护照姓名",
+      "passport_number": "护照号码",
+      "birthday": "生日",
+      "image": "图片",
+      "actions": "操作"
+    },
+    "no_name": "无姓名",
+    "needs_update": "需要修改",
+    "view_image": "查看",
+    "no_image": "无",
+    "all_matched": "所有护照都已匹配！",
+    "no_unmatched": "没有未匹配的护照"
+  },
+  "image": {
+    "zoom_in": "放大",
+    "zoom_out": "缩小",
+    "reset": "重置",
+    "receipt_image": "收据图片",
+    "passport_image": "护照图片",
+    "image_not_found": "找不到图片"
+  },
+  "notifications": {
+    "download_success": "收据下载成功",
+    "download_failed": "生成收据时发生错误",
+    "network_error": "网络错误",
+    "no_processing": "当前没有正在处理的任务",
+    "processing_status": "当前处理中：{done}/{total}（{percent}%）",
+    "cannot_check_status": "无法检查处理状态"
+  },
+  "errors": {
+    "login_failed": "登录时发生错误",
+    "register_failed": "注册时发生错误",
+    "upload_failed": "上传时发生错误",
+    "processing_failed": "处理时发生错误",
+    "result_fetch_failed": "查询结果时发生错误：{error}",
+    "passport_edit_failed": "加载护照信息时发生错误",
+    "receipt_not_found": "找不到收据",
+    "invalid_language": "不支持的语言",
+    "network_error": "网络错误",
+    "page_not_found": "找不到页面",
+    "server_error": "服务器内部错误"
+  },
+  "help": {
+    "title": "帮助",
+    "shilla_help": {
+      "title": "帮助",
+      "point1": "只修改收据号码即可与Excel数据匹配",
+      "point2": "同时修改护照号码可以与护照信息关联",
+      "point3": "如果护照号码不准确，可以稍后单独修改",
+      "point4": "Excel数据中没有的收据号码将无法匹配"
+    }
+  },
+  "language": {
+    "current": "中文",
+    "switch_to_chinese": "中文",
+    "switch_to_korean": "한국어"
+  }
+}
