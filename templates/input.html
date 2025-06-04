@@ -6,9 +6,31 @@
         <div class="card-body">
             <div class="text-center mb-4">
                 <img src="/static/YidoLogo.png" alt="로고" style="height: 80px;">
-                <!-- <h3 class="mt-3">ZIP 파일 업로드</h3> -->
-                <p class="text-muted">영수증과 여권 이미지가 포함된 ZIP 파일을 업로드하세요</p>
-                <div class="badge bg-info mb-2">{{ duty_free_type }}</div>
+                <h3 class="mt-3">OCR 처리 시스템</h3>
+                <p class="text-muted">면세점을 선택하고 영수증과 여권 이미지가 포함된 ZIP 파일을 업로드하세요</p>
+            </div>
+            
+            <!-- 면세점 선택 섹션 -->
+            <div class="duty-free-selection mb-4">
+                <h5 class="text-center mb-3">처리할 면세점을 선택하세요</h5>
+                <div class="duty-free-options">
+                    <div class="duty-free-option">
+                        <input type="radio" id="lotte" name="duty_free_type" value="lotte" checked>
+                        <label for="lotte" class="duty-free-label">
+                            <div class="icon"><img src="/static/LOTTE_LOGO.png" alt="롯데면세점" class="logo-img"></div>
+                            <div class="text">롯데면세점</div>
+                            <div class="description">14자리 영수증 번호</div>
+                        </label>
+                    </div>
+                    <div class="duty-free-option">
+                        <input type="radio" id="shilla" name="duty_free_type" value="shilla">
+                        <label for="shilla" class="duty-free-label">
+                            <div class="icon"><img src="/static/shillaLogo.png" alt="신라면세점" class="logo-img"></div>
+                            <div class="text">신라면세점</div>
+                            <div class="description">13자리 영수증 번호</div>
+                        </label>
+                    </div>
+                </div>
             </div>
             
             <!-- 이전 결과 확인 버튼 -->
@@ -16,9 +38,9 @@
                 <a href="/result/" class="btn btn-outline-info me-2" id="viewResultBtn">
                     <i class="fas fa-history me-2"></i>이전 처리 결과 보기
                 </a>
-                <a href="/excel-upload/" class="btn btn-outline-success me-2">
+                <button type="button" class="btn btn-outline-success me-2" id="excelUploadBtn">
                     <i class="fas fa-file-excel me-2"></i>엑셀 데이터 업로드
-                </a>
+                </button>
                 <button type="button" class="btn btn-outline-secondary" onclick="checkProcessingStatus()">
                     <i class="fas fa-info-circle me-2"></i>처리 현황 확인
                 </button>
@@ -55,11 +77,12 @@
                             <i class="fas fa-question-circle text-info me-2"></i>사용 방법
                         </h6>
                         <ul class="list-unstyled mb-0 small">
+                            <li><i class="fas fa-check text-success me-2"></i>면세점을 선택하세요</li>
+                            <li><i class="fas fa-check text-success me-2"></i>해당 면세점의 엑셀 데이터를 먼저 업로드하세요</li>
                             <li><i class="fas fa-check text-success me-2"></i>영수증과 여권 이미지를 하나의 ZIP 파일로 압축</li>
                             <li><i class="fas fa-check text-success me-2"></i>지원 형식: JPG, PNG, JPEG</li>
                             <li><i class="fas fa-check text-success me-2"></i>한글 및 영문 텍스트 자동 인식</li>
                             <li><i class="fas fa-check text-success me-2"></i>처리 완료 후 수령증 자동 생성</li>
-                            <li class="mt-2"><i class="fas fa-info-circle text-warning me-2"></i><strong>엑셀 데이터를 먼저 업로드해주세요!</strong></li>
                         </ul>
                     </div>
                 </div>
@@ -71,7 +94,7 @@
 <style>
 /* 업로드 페이지 전용 스타일 */
 .upload-card {
-    max-width: 600px;
+    max-width: 700px;
     margin: 50px auto;
     border: none;
     border-radius: 10px;
@@ -81,6 +104,83 @@
 
 .upload-card:hover {
     transform: translateY(-5px);
+}
+
+/* 면세점 선택 스타일 */
+.duty-free-selection {
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 20px;
+    background-color: #f8f9fa;
+}
+
+.duty-free-options {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+.duty-free-option {
+    flex: 1;
+    max-width: 200px;
+    position: relative;
+}
+
+.duty-free-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+}
+
+.duty-free-label {
+    display: block;
+    padding: 20px 15px;
+    text-align: center;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    background-color: white;
+    height: 100%;
+}
+
+.duty-free-option input[type="radio"]:checked + .duty-free-label {
+    border-color: #007bff;
+    background-color: #e7f1ff;
+    color: #007bff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+.duty-free-label:hover {
+    border-color: #007bff;
+    transform: translateY(-1px);
+}
+
+.duty-free-label .icon {
+    margin-bottom: 10px;
+}
+
+.duty-free-label .logo-img {
+    width: 50px;
+    height: 50px;
+    object-fit: contain;
+}
+
+.duty-free-label .text {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.duty-free-label .description {
+    font-size: 12px;
+    color: #6c757d;
+    font-weight: normal;
+}
+
+.duty-free-option input[type="radio"]:checked + .duty-free-label .description {
+    color: #0056b3;
 }
 
 .drop-zone {
@@ -173,6 +273,18 @@
     background-color: #d4edda;
     color: #155724;
 }
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+    .duty-free-options {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .duty-free-option {
+        max-width: none;
+    }
+}
 </style>
 
 <script>
@@ -186,6 +298,36 @@ document.addEventListener('DOMContentLoaded', function() {
     const progressStatus = document.getElementById('progressBar');
     const progressCount = document.getElementById('progressCount');
     const fileNameDisplay = document.getElementById('fileNameDisplay');
+    const excelUploadBtn = document.getElementById('excelUploadBtn');
+
+    // 면세점 선택에 따라 엑셀 업로드 버튼 업데이트
+    function updateExcelUploadButton() {
+        const selectedDutyFree = document.querySelector('input[name="duty_free_type"]:checked').value;
+        const dutyFreeName = selectedDutyFree === 'lotte' ? '롯데' : '신라';
+        excelUploadBtn.innerHTML = `<i class="fas fa-file-excel me-2"></i>${dutyFreeName} 엑셀 데이터 업로드`;
+    }
+
+    // 면세점 선택 변경 이벤트
+    document.querySelectorAll('input[name="duty_free_type"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            updateExcelUploadButton();
+            
+            // 선택 변경 시 기존 파일 선택 초기화
+            fileInput.value = '';
+            fileNameDisplay.textContent = '여기에 ZIP 파일을 드래그하거나 클릭하여 선택하세요';
+            resultBox.innerHTML = '';
+            toggleHelpSection();
+        });
+    });
+
+    // 초기 엑셀 업로드 버튼 텍스트 설정
+    updateExcelUploadButton();
+
+    // 엑셀 업로드 버튼 클릭 이벤트
+    excelUploadBtn.addEventListener('click', function() {
+        const selectedDutyFree = document.querySelector('input[name="duty_free_type"]:checked').value;
+        window.location.href = `/excel-upload/?duty_free=${selectedDutyFree}`;
+    });
 
     // 드롭존 클릭 시 파일 선택
     dropZone.addEventListener('click', function() {
@@ -341,10 +483,13 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        // 선택된 면세점 타입 확인
+        const selectedDutyFree = document.querySelector('input[name="duty_free_type"]:checked').value;
+
         // UI 상태 변경
         submitBtn.disabled = true;
         spinner.style.display = 'inline-block';
-        resultBox.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> 파일을 업로드하고 처리 중입니다...</div>';
+        resultBox.innerHTML = `<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> ${selectedDutyFree === 'lotte' ? '롯데' : '신라'} 면세점 파일을 업로드하고 처리 중입니다...</div>`;
         toggleHelpSection();
         
         // 진행상황 폴링 시작
@@ -352,6 +497,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const formData = new FormData();
         formData.append('folder', fileInput.files[0]);
+        formData.append('duty_free_type', selectedDutyFree);
         
         try {
             const response = await fetch('/result/', {

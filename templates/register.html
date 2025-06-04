@@ -27,47 +27,6 @@
         .btn-primary:hover {
             background-color: #0056b3;
         }
-        .duty-free-options {
-            display: flex;
-            gap: 15px;
-            margin-top: 10px;
-        }
-        .duty-free-option {
-            flex: 1;
-            position: relative;
-        }
-        .duty-free-option input[type="radio"] {
-            position: absolute;
-            opacity: 0;
-        }
-        .duty-free-option label {
-            display: block;
-            padding: 15px;
-            text-align: center;
-            border: 2px solid #dee2e6;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 500;
-        }
-        .duty-free-option input[type="radio"]:checked + label {
-            border-color: #007bff;
-            background-color: #e7f1ff;
-            color: #007bff;
-        }
-        .duty-free-option label:hover {
-            border-color: #007bff;
-        }
-        .duty-free-option .icon {
-            font-size: 24px;
-            margin-bottom: 5px;
-        }
-        .duty-free-option .logo-img {
-            width: 40px;
-            height: 40px;
-            object-fit: contain;
-            margin-bottom: 5px;
-        }
     </style>
 </head>
 <body>
@@ -100,28 +59,6 @@
             <div class="mb-3">
                 <label for="password" class="form-label">비밀번호</label>
                 <input type="password" class="form-control" id="password" name="password" required>
-            </div>
-            <div class="mb-4">
-                <label class="form-label">면세점 선택 <span class="text-danger">*</span></label>
-                <div class="duty-free-options">
-                    <div class="duty-free-option">
-                        <input type="radio" id="lotte" name="duty_free_type" value="lotte" checked>
-                        <label for="lotte">
-                            <div class="icon"><img src="/static/LOTTE_LOGO.png"  alt="롯데면세점" class="logo-img"></div>
-                            <div>롯데면세점</div>
-                        </label>
-                    </div>
-                    <div class="duty-free-option">
-                        <input type="radio" id="shilla" name="duty_free_type" value="shilla">
-                        <label for="shilla">
-                            <div class="icon"><img src="/static/shillaLogo.png"  alt="신라면세점" class="logo-img"></div>
-                            <div>신라면세점</div>
-                        </label>
-                    </div>
-                </div>
-                <div class="form-text mt-2">
-                    <small class="text-muted">선택한 면세점에 맞는 처리 방식이 적용됩니다.</small>
-                </div>
             </div>
             <button type="submit" class="btn btn-primary w-100">회원가입</button>
         </form>

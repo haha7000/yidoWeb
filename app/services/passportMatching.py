@@ -1,16 +1,20 @@
-# app/services/passportMatching.py - 수정된 버전 (영수증 ID 포함)
+
+# app/services/passportMatching.py - 수정된 버전
 
 from app.models.models import Receipt, ReceiptMatchLog, Passport, User, DutyFreeType
 from app.core.database import SessionLocal
 from sqlalchemy import text
 
 
-def fetch_results(user_id):
+def fetch_results(user_id, duty_free_type="lotte"):
+    """면세점 타입에 따라 결과 반환"""
     with SessionLocal() as db:
-        # 사용자 조회하여 면세점 타입 확인
-        user = db.query(User).filter(User.id == user_id).first()
-        
-        if user.duty_free_type == DutyFreeType.LOTTE:
+        if duty_free_type == "shilla":
+            # 신라 면세점 결과 조회
+            from app.services.shilla_matching import fetch_shilla_results_with_receipt_ids
+            return fetch_shilla_results_with_receipt_ids(user_id)
+        else:
+            # 롯데 면세점 결과 조회
             # 사용자별 매칭된 영수증 번호와 이름 조회 (롯데) - 컬럼명 수정
             sql = """
             SELECT r.receipt_number, e.name
@@ -29,20 +33,14 @@ def fetch_results(user_id):
             WHERE rml.is_matched = FALSE AND r.user_id = :user_id AND rml.user_id = :user_id
             """
             unmatched = db.execute(text(unmatched_sql), {"user_id": user_id}).fetchall()
-        else:
-            # 신라 면세점인 경우 수정된 함수 사용 (영수증 ID 포함)
-            from app.services.shilla_matching import fetch_shilla_results_with_receipt_ids
-            return fetch_shilla_results_with_receipt_ids(user_id)
 
-        return matched, unmatched
-    
+            return matched, unmatched
 
-def matching_passport(user_id):
-    # 사용자 조회하여 면세점 타입 확인
+
+def matching_passport(user_id, duty_free_type="lotte"):
+    """면세점 타입에 따라 여권 매칭 정보 반환"""
     with SessionLocal() as db:
-        user = db.query(User).filter(User.id == user_id).first()
-        
-        if user.duty_free_type == DutyFreeType.SHILLA:
+        if duty_free_type == "shilla":
             # 신라 면세점용 처리 - 수정된 로직 사용 (영수증 ID 포함)
             from app.services.shilla_matching import fetch_shilla_results_with_receipt_ids
             matched_list, unmatched = fetch_shilla_results_with_receipt_ids(user_id)
@@ -91,7 +89,7 @@ def matching_passport(user_id):
             
         else:
             # 기존 롯데 로직
-            matched, unmatched = fetch_results(user_id)
+            matched, unmatched = fetch_results(user_id, duty_free_type)
             print(f"사용자 {user_id}의 롯데 매칭 정보: {matched}")
             print("=== 매칭된 영수증과 여권 정보 ===")
             
@@ -143,17 +141,22 @@ def matching_passport(user_id):
 
 
 def get_unmatched_passports(user_id):
+    """면세점 타입에 관계없이 매칭되지 않은 여권 조회"""
     with SessionLocal() as db:
-        # 사용자 조회하여 면세점 타입 확인
-        user = db.query(User).filter(User.id == user_id).first()
-        
-        if user.duty_free_type == DutyFreeType.LOTTE:
-            # 롯데: passport 테이블의 이름이 lotte_excel_data에 없는 경우 찾기
+        # 동적 테이블 조회로 변경
+        try:
+            # 롯데와 신라 모두에서 매칭되지 않은 여권 조회
             sql = """
-            SELECT p.name as passport_name, p.passport_number, p.birthday, p.file_path
+            SELECT DISTINCT p.name as passport_name, p.passport_number, p.birthday, p.file_path
             FROM passports p
-            LEFT JOIN lotte_excel_data e ON p.name = e.name
-            WHERE e.name IS NULL AND p.user_id = :user_id;
+            WHERE p.user_id = :user_id
+            AND p.is_matched = FALSE
+            AND NOT EXISTS (
+                SELECT 1 FROM lotte_excel_data le WHERE le.name = p.name
+                UNION ALL
+                SELECT 1 FROM shilla_excel_data se WHERE se.name = p.name
+            )
+            ORDER BY p.name
             """
             unmatched = db.execute(text(sql), {"user_id": user_id}).fetchall()
             
@@ -163,10 +166,21 @@ def get_unmatched_passports(user_id):
                 "birthday": row[2],
                 "file_path": row[3]
             } for row in unmatched]
-        else:
-            # 신라: 수정된 로직 사용 (result.html과 동일한 로직)
-            from app.services.shilla_matching import get_shilla_unmatched_passports
-            return get_shilla_unmatched_passports(user_id)
+            
+        except Exception as e:
+            print(f"매칭되지 않은 여권 조회 오류: {e}")
+            # 테이블이 없는 경우 기본 조회
+            unmatched = db.query(Passport).filter(
+                Passport.user_id == user_id,
+                Passport.is_matched == False
+            ).all()
+            
+            return [{
+                "passport_name": passport.name,
+                "passport_number": passport.passport_number,
+                "birthday": passport.birthday,
+                "file_path": passport.file_path
+            } for passport in unmatched]
 
 
 def update_passport_matching_status(passport_name: str, is_matched: bool, user_id: int):

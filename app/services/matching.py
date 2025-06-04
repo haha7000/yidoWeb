@@ -33,16 +33,13 @@ def matchingResult(user_id):
         print("롯데 매칭 결과 저장 완료")
 
 
-def fetch_results(user_id):
-    """사용자의 면세점 타입에 따라 적절한 결과 반환"""
+def fetch_results(user_id, duty_free_type="lotte"):
+    """면세점 타입에 따라 적절한 결과 반환"""
     with SessionLocal() as db:
-        # 사용자 조회
-        user = db.query(User).filter(User.id == user_id).first()
-        
-        if user.duty_free_type == DutyFreeType.SHILLA:
+        if duty_free_type == "shilla":
             # 신라 면세점 결과 조회
-            from app.services.shilla_matching import fetch_shilla_results
-            return fetch_shilla_results(user_id)
+            from app.services.shilla_matching import fetch_shilla_results_with_receipt_ids
+            return fetch_shilla_results_with_receipt_ids(user_id)
         else:
             # 롯데 면세점 결과 조회
             # 사용자별 매칭된 영수증 번호 조회
@@ -64,4 +61,3 @@ def fetch_results(user_id):
             unmatched = db.execute(text(unmatched_sql), {"user_id": user_id}).fetchall()
 
             return matched, unmatched
-        

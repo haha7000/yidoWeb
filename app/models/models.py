@@ -6,6 +6,7 @@ import enum
 Base = declarative_base()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# DutyFreeType enum은 유지하되, User 모델에서는 제거
 class DutyFreeType(enum.Enum):
     LOTTE = "lotte"
     SHILLA = "shilla"
@@ -17,7 +18,7 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False)
     email = Column(String(100), unique=True, nullable=False)
     hashed_password = Column(String(100), nullable=False)
-    duty_free_type = Column(Enum(DutyFreeType), nullable=False, default=DutyFreeType.LOTTE)
+    # duty_free_type 필드 제거
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
 

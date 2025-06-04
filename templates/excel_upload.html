@@ -14,6 +14,9 @@
             </div>
             
             <form id="excelUploadForm" enctype="multipart/form-data">
+                <!-- 면세점 타입을 hidden으로 전송 -->
+                <input type="hidden" name="duty_free_type" value="{{ duty_free_value }}">
+                
                 <div class="drop-zone mb-3" id="excelDropZone">
                     <i class="fas fa-file-excel fa-3x text-success mb-3"></i>
                     <p class="mb-0" id="excelFileNameDisplay">여기에 엑셀 파일을 드래그하거나 클릭하여 선택하세요</p>
@@ -24,14 +27,25 @@
                     <h6><i class="fas fa-exclamation-triangle"></i> 주의사항</h6>
                     <ul class="mb-0 small">
                         <li>엑셀 파일 형식: .xlsx 또는 .xls</li>
-                        <li>필수 컬럼: 교환권번호(receiptNumber), 고객명(name), PayBack</li>
+                        <li>필수 컬럼: 
+                            {% if duty_free_value == "lotte" %}
+                            교환권번호(receiptNumber), 고객명(name), PayBack
+                            {% else %}
+                            BILL 번호(receiptNumber), 고객명(name), 수수료(PayBack)
+                            {% endif %}
+                        </li>
                         <li>기존 데이터는 유지되며, 새로운 데이터가 추가됩니다</li>
+                        {% if duty_free_value == "lotte" %}
+                        <li>롯데면세점: 14자리 영수증 번호, 멀티헤더 지원</li>
+                        {% else %}
+                        <li>신라면세점: 13자리 영수증 번호, 단순헤더 구조</li>
+                        {% endif %}
                     </ul>
                 </div>
                 
                 <div class="text-center">
                     <button type="submit" class="btn btn-success" id="uploadBtn">
-                        <i class="fas fa-upload me-2"></i>엑셀 업로드
+                        <i class="fas fa-upload me-2"></i>{{ duty_free_type }} 엑셀 업로드
                         <span class="spinner spinner-border spinner-border-sm" id="excelSpinner" style="display: none;"></span>
                     </button>
                     <a href="/upload/" class="btn btn-outline-secondary ms-2">
@@ -44,7 +58,7 @@
             
             <!-- 현재 데이터 통계 -->
             <div class="mt-5">
-                <h5>현재 저장된 데이터</h5>
+                <h5>{{ duty_free_type }} 저장된 데이터</h5>
                 <div class="row">
                     <div class="col-md-6">
                         <div class="card bg-light">
@@ -60,6 +74,33 @@
                                 <h4 class="text-success">{{ unique_customers }}</h4>
                                 <p class="mb-0">고객 수</p>
                             </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 면세점별 데이터 형식 안내 -->
+                <div class="mt-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title">
+                                <i class="fas fa-info-circle text-info"></i> 
+                                {{ duty_free_type }} 데이터 형식 안내
+                            </h6>
+                            {% if duty_free_value == "lotte" %}
+                            <ul class="mb-0 small">
+                                <li><strong>영수증 번호:</strong> 14자리 숫자 (예: 90208724000593)</li>
+                                <li><strong>파일 구조:</strong> 멀티헤더 엑셀 파일 지원</li>
+                                <li><strong>컬럼명:</strong> 교환권번호, 고객명, PayBack(환급/수수료)</li>
+                                <li><strong>특징:</strong> "매출_" 접두어 자동 제거, 불필요한 컬럼 자동 제거</li>
+                            </ul>
+                            {% else %}
+                            <ul class="mb-0 small">
+                                <li><strong>영수증 번호:</strong> 13자리 숫자 (예: 0124507700631)</li>
+                                <li><strong>파일 구조:</strong> 단순 헤더 엑셀 파일</li>
+                                <li><strong>컬럼명:</strong> BILL 번호, 고객명, 수수료</li>
+                                <li><strong>특징:</strong> 여권번호 연동 기능, 영수증-여권 자동 매칭</li>
+                            </ul>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -93,6 +134,19 @@
     background-color: #c8e6c9;
     border-color: #1e7e34;
     transform: scale(1.02);
+}
+
+.btn-success {
+    background: linear-gradient(45deg, #28a745, #20c997);
+    border: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-success:hover {
+    background: linear-gradient(45deg, #218838, #1da88a);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
 }
 </style>
 
@@ -143,9 +197,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 fileInput.files = files;
                 fileNameDisplay.innerHTML = `<i class="fas fa-file-excel text-success"></i> 선택된 파일: <strong>${file.name}</strong>`;
                 uploadResult.innerHTML = '';
+                
+                // 파일 크기 표시
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                fileNameDisplay.innerHTML += `<br><small class="text-muted">파일 크기: ${fileSize} MB</small>`;
             } else {
                 uploadResult.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> 엑셀 파일만 업로드 가능합니다.</div>';
                 fileInput.value = '';
+                fileNameDisplay.textContent = '여기에 엑셀 파일을 드래그하거나 클릭하여 선택하세요';
             }
         }
     }
@@ -159,12 +218,16 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        // UI 상태 변경
         uploadBtn.disabled = true;
         spinner.style.display = 'inline-block';
-        uploadResult.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> 엑셀 파일을 처리 중입니다...</div>';
+        
+        const dutyFreeType = "{{ duty_free_type }}";
+        uploadResult.innerHTML = `<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> ${dutyFreeType} 엑셀 파일을 처리 중입니다...</div>`;
 
         const formData = new FormData();
         formData.append('excel_file', fileInput.files[0]);
+        formData.append('duty_free_type', "{{ duty_free_value }}");
         
         try {
             const response = await fetch('/upload-excel/', {
@@ -178,11 +241,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 uploadResult.innerHTML = `
                     <div class="alert alert-success">
                         <i class="fas fa-check-circle"></i> 
-                        <strong>업로드 성공!</strong><br>
-                        추가된 레코드: ${result.records_added}개<br>
-                        처리 시간: ${result.processing_time}
+                        <strong>${dutyFreeType} 업로드 성공!</strong><br>
+                        추가된 레코드: <strong>${result.records_added}</strong>개<br>
+                        전체 레코드: <strong>${result.total_records}</strong>개<br>
+                        처리 시간: <strong>${result.processing_time}</strong>
                     </div>
                 `;
+                
+                // 성공 후 알림
+                showNotification(`${dutyFreeType} 데이터가 성공적으로 업로드되었습니다!`, 'success');
                 
                 // 3초 후 페이지 새로고침하여 통계 업데이트
                 setTimeout(() => {
@@ -192,23 +259,50 @@ document.addEventListener('DOMContentLoaded', function() {
                 uploadResult.innerHTML = `
                     <div class="alert alert-danger">
                         <i class="fas fa-exclamation-circle"></i> 
-                        오류: ${result.detail || '엑셀 처리 중 오류가 발생했습니다.'}
+                        <strong>오류:</strong> ${result.detail || '엑셀 처리 중 오류가 발생했습니다.'}
                     </div>
                 `;
+                showNotification('엑셀 업로드 중 오류가 발생했습니다.', 'error');
             }
         } catch (error) {
             console.error('업로드 오류:', error);
             uploadResult.innerHTML = `
                 <div class="alert alert-danger">
                     <i class="fas fa-exclamation-circle"></i> 
-                    네트워크 오류: ${error.message}
+                    <strong>네트워크 오류:</strong> ${error.message}
                 </div>
             `;
+            showNotification('네트워크 오류가 발생했습니다.', 'error');
         } finally {
+            // UI 상태 복원
             uploadBtn.disabled = false;
             spinner.style.display = 'none';
         }
     });
+
+    // 알림 함수
+    function showNotification(message, type = 'info') {
+        const alertClass = type === 'success' ? 'alert-success' : 
+                          type === 'error' ? 'alert-danger' : 'alert-info';
+        
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 350px;';
+        alertDiv.innerHTML = `
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle'}"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        // 5초 후 자동 제거
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
 });
 </script>
 {% endblock %}
