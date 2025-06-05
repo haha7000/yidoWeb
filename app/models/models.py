@@ -1,5 +1,8 @@
+# app/models/models.py - 아카이브 모델 추가된 버전
+
 from sqlalchemy import Column, Integer, String, Text, Boolean, Date, ForeignKey, TIMESTAMP, func, Float, Enum
 from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy.dialects.postgresql import JSONB
 from passlib.context import CryptContext
 import enum
 
@@ -18,7 +21,7 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False)
     email = Column(String(100), unique=True, nullable=False)
     hashed_password = Column(String(100), nullable=False)
-    # duty_free_type 필드 제거
+    # duty_free_type 필드 제거됨
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
@@ -26,6 +29,7 @@ class User(Base):
     receipts = relationship("Receipt", back_populates="user")
     passports = relationship("Passport", back_populates="user")
     shilla_receipts = relationship("ShillaReceipt", back_populates="user")
+    archives = relationship("ProcessingArchive", back_populates="user")
     
     def verify_password(self, password: str) -> bool:
         return pwd_context.verify(password, self.hashed_password)
@@ -46,9 +50,6 @@ class ShillaReceipt(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
     
     user = relationship("User", back_populates="shilla_receipts")
-
-# 엑셀 데이터 모델들은 제거하고 동적으로 테이블 생성
-# LotteExcelData와 ShillaExcelData 클래스 제거
 
 class Passport(Base):
     __tablename__ = "passports"
@@ -106,3 +107,51 @@ class UnrecognizedImage(Base):
     
     def __repr__(self):
         return f"UnrecognizedImage(file_path={self.file_path})"
+
+# === 새로 추가된 아카이브 관련 모델들 ===
+
+class ProcessingArchive(Base):
+    """처리 완료된 세션 아카이브"""
+    __tablename__ = "processing_archives"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    session_name = Column(String(200), nullable=False)
+    archive_date = Column(TIMESTAMP, server_default=func.now())
+    
+    # 통계 정보
+    total_receipts = Column(Integer, default=0)
+    matched_receipts = Column(Integer, default=0)
+    total_passports = Column(Integer, default=0)
+    matched_passports = Column(Integer, default=0)
+    
+    # 메타데이터
+    duty_free_type = Column(String(20), nullable=True)
+    notes = Column(Text, nullable=True)
+    
+    # 상세 데이터 (JSON)
+    archive_data = Column(JSONB, nullable=True)
+    
+    user = relationship("User", back_populates="archives")
+    matching_histories = relationship("MatchingHistory", back_populates="archive")
+
+class MatchingHistory(Base):
+    """매칭 이력 저장"""
+    __tablename__ = "matching_history"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    archive_id = Column(Integer, ForeignKey("processing_archives.id"), nullable=True)
+    
+    # 매칭 정보
+    customer_name = Column(String(100), nullable=True)
+    passport_number = Column(String(20), nullable=True)
+    receipt_numbers = Column(Text, nullable=True)  # JSON 문자열로 저장
+    excel_data = Column(JSONB, nullable=True)
+    
+    # 매칭 상태
+    match_status = Column(String(50), nullable=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    user = relationship("User")
+    archive = relationship("ProcessingArchive", back_populates="matching_histories")

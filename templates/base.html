@@ -8,31 +8,220 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --success-color: #059669;
+            --warning-color: #d97706;
+            --danger-color: #dc2626;
+            --bg-light: #f8fafc;
+            --bg-card: #ffffff;
+            --border-color: #e2e8f0;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+        }
+
         body {
-            font-family: 'Roboto', sans-serif;
-            background-color: #f8f9fa;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-primary);
+            line-height: 1.6;
         }
-        .container {
-            margin-top: 20px;
-        }
+
+        /* 네비게이션 바 스타일 */
         .navbar {
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            background: linear-gradient(135deg, var(--primary-color) 0%, #3b82f6 100%);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 1rem 0;
         }
-        .card {
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: white !important;
         }
-        .table th {
-            background-color: #007bff;
+
+        .navbar-nav .nav-link {
+            color: rgba(255, 255, 255, 0.9) !important;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .navbar-nav .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white !important;
+        }
+
+        /* 대시보드 헤더 */
+        .dashboard-header {
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+
+        .dashboard-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .dashboard-subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        /* 액션 버튼 그룹 */
+        .action-buttons {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .action-buttons .btn {
+            font-weight: 500;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            border: none;
+            margin: 0.25rem;
+            min-width: 140px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #3b82f6 100%);
             color: white;
         }
-        
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success-color) 0%, #10b981 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, var(--warning-color) 0%, #f59e0b 100%);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+        }
+
+        .btn-outline-secondary {
+            border: 2px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .btn-outline-secondary:hover {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        /* 카드 스타일 */
+        .card {
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            background: var(--bg-card);
+            transition: all 0.2s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            background: var(--bg-light);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            border-radius: 12px 12px 0 0 !important;
+        }
+
+        /* 스탯 카드 */
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.875rem;
+            letter-spacing: 0.5px;
+        }
+
+        /* 알림 스타일 */
+        .alert {
+            border: none;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .alert-info {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            color: #1e40af;
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            color: #065f46;
+        }
+
+        .alert-warning {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            color: #92400e;
+        }
+
+        .alert-danger {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            color: #991b1b;
+        }
+
         /* 이미지 줌 관련 스타일 */
         .image-container {
             position: relative;
             overflow: hidden;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
             height: 400px;
+            background: var(--bg-light);
         }
         
         .receipt-image, .passport-image {
@@ -51,31 +240,102 @@
         }
         
         .input-error {
-            border-color: #dc3545 !important;
-            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+            border-color: var(--danger-color) !important;
+            box-shadow: 0 0 0 0.2rem rgba(220, 38, 38, 0.25) !important;
         }
         
         #error-message {
-            color: #dc3545;
+            color: var(--danger-color);
             font-size: 0.875em;
             margin-top: 5px;
+        }
+
+        /* 반응형 */
+        @media (max-width: 768px) {
+            .dashboard-title {
+                font-size: 1.5rem;
+            }
+            
+            .action-buttons .btn {
+                width: 100%;
+                margin: 0.25rem 0;
+            }
+            
+            .stat-number {
+                font-size: 2rem;
+            }
+        }
+
+        /* 애니메이션 */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        /* 로딩 스피너 */
+        .spinner {
+            display: none;
+        }
+
+        .loading .spinner {
+            display: inline-block;
+        }
+
+        /* 프로그레스 바 */
+        .progress {
+            height: 8px;
+            border-radius: 4px;
+            background-color: var(--bg-light);
+        }
+
+        .progress-bar {
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--primary-color), #3b82f6);
+            transition: width 0.3s ease;
         }
     </style>
 </head>
 <body>
     <!-- 네비게이션 바 -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <nav class="navbar navbar-expand-lg">
         <div class="container">
-            <a class="navbar-brand" href="/upload/">
-                <img src="/static/YidoLogo.png" alt="로고" style="height: 80px;">
+            <a class="navbar-brand d-flex align-items-center" href="/upload/">
+                <i class="fas fa-receipt me-2"></i>
+                OCR 처리 시스템
             </a>
-            <div class="navbar-nav ms-auto">
-                {% if user %}
-                <span class="nav-link">환영합니다, {{ user.username }}님</span>
-                <a class="nav-link" href="#" onclick="logout()">로그아웃</a>
-                {% else %}
-                <a class="nav-link" href="/">로그인</a>
-                {% endif %}
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <i class="fas fa-bars text-white"></i>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <div class="navbar-nav ms-auto">
+                    {% if user %}
+                    <span class="nav-link">
+                        <i class="fas fa-user me-1"></i>
+                        {{ user.username }}님
+                    </span>
+                    <a class="nav-link" href="#" onclick="logout()">
+                        <i class="fas fa-sign-out-alt me-1"></i>
+                        로그아웃
+                    </a>
+                    {% else %}
+                    <a class="nav-link" href="/">
+                        <i class="fas fa-sign-in-alt me-1"></i>
+                        로그인
+                    </a>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </nav>
@@ -137,6 +397,13 @@
 
         // 페이지 로드 시 이미지 설정
         document.addEventListener('DOMContentLoaded', function() {
+            // 페이드인 애니메이션 적용
+            document.querySelectorAll('.fade-in-up').forEach((el, index) => {
+                setTimeout(() => {
+                    el.style.animationDelay = `${index * 0.1}s`;
+                }, 100);
+            });
+
             // 영수증 이미지가 있으면 설정
             const receiptImage = document.getElementById('receipt-image');
             if (receiptImage) {
@@ -221,6 +488,33 @@
                 errorMessage.style.display = 'none';
                 errorMessage.textContent = '';
             }
+        }
+
+        // 알림 함수
+        function showNotification(message, type = 'info') {
+            const alertClass = type === 'success' ? 'alert-success' : 
+                              type === 'error' ? 'alert-danger' : 
+                              type === 'warning' ? 'alert-warning' : 'alert-info';
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+            alertDiv.style.cssText = 'top: 80px; right: 20px; z-index: 9999; min-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+            alertDiv.innerHTML = `
+                <i class="fas ${type === 'success' ? 'fa-check-circle' : 
+                               type === 'error' ? 'fa-exclamation-triangle' : 
+                               type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(alertDiv);
+            
+            // 5초 후 자동 제거
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
         }
     </script>
 </body>

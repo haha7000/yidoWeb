@@ -2,7 +2,17 @@
 
 {% block content %}
 <div class="container my-5">
-    <h1 class="text-center mb-4">OCR 처리 결과</h1>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>OCR 처리 결과</h1>
+        <div class="d-flex gap-2">
+            <a href="/history/" class="btn btn-info">
+                <i class="fas fa-history"></i> 이력 조회
+            </a>
+            <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#completeModal">
+                <i class="fas fa-check-circle"></i> 처리 완료
+            </button>
+        </div>
+    </div>
     
     {% if error %}
     <div class="alert alert-danger" role="alert">
@@ -11,7 +21,7 @@
     </div>
     {% endif %}
     
-    <!-- 처리 통계 (상단으로 이동) -->
+    <!-- 처리 통계 -->
     <div class="row mb-4">
         <div class="col-md-12">
             <div class="card shadow-sm">
@@ -47,7 +57,7 @@
                         </div>
                     </div>
                     
-                    <!-- 진행률 바 추가 -->
+                    <!-- 진행률 바 -->
                     <div class="mt-4">
                         {% set completion_rate = ((total_receipts / (total_receipts + unmatched_receipts|length)) * 100) if (total_receipts + unmatched_receipts|length) > 0 else 0 %}
                         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -69,21 +79,21 @@
     <!-- 액션 버튼들 -->
     <div class="mb-4">
         <div class="row">
-            <div class="col-md-6 mb-3">
+            <div class="col-md-4 mb-3">
                 <div class="d-grid">
                     <a href="/generate-receipts/" class="btn btn-success btn-lg" id="downloadBtn">
                         <i class="fas fa-download me-2"></i>수령증 다운로드
                     </a>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
+            <div class="col-md-4 mb-3">
                 <div class="d-grid">
                     <a href="/unmatched-passports/" class="btn btn-warning btn-lg">
                         <i class="fas fa-passport me-2"></i>매칭안된 여권
                     </a>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
+            <div class="col-md-4 mb-3">
                 <div class="d-grid">
                     <a href="/upload/" class="btn btn-outline-primary btn-lg">
                         <i class="fas fa-upload me-2"></i>새로운 처리
@@ -173,7 +183,7 @@
                             <div id="customer{{ loop.index }}" class="accordion-collapse collapse"
                                  data-bs-parent="#customerAccordion">
                                 <div class="accordion-body">
-                                    <!-- 신라 면세점용 추가 정보 표시 -->
+                                    <!-- 기존 아코디언 내용은 동일하게 유지 -->
                                     {% if duty_free_type == "shilla" and customer.get('passport_name') and customer.get('excel_name') %}
                                     <div class="alert alert-info mb-3">
                                         <strong><i class="fas fa-info-circle"></i> 매칭 정보:</strong><br>
@@ -339,14 +349,64 @@
     </div>
 </div>
 
+<!-- 처리 완료 모달 -->
+<div class="modal fade" id="completeModal" tabindex="-1" aria-labelledby="completeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="completeModalLabel">
+                    <i class="fas fa-check-circle text-success"></i> 처리 완료
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="/complete-session/">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>현재 처리 상태:</strong><br>
+                        매칭된 고객: {{ results|length }}명<br>
+                        처리된 영수증: {{ total_receipts }}건<br>
+                        미처리 영수증: {{ unmatched_receipts|length }}건
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="save_to_history" name="save_to_history" value="true" checked>
+                        <label class="form-check-label" for="save_to_history">
+                            <strong>이력에 저장</strong> (나중에 조회 가능)
+                        </label>
+                    </div>
+                    
+                    <div class="mb-3" id="sessionNameGroup">
+                        <label for="session_name" class="form-label">세션 이름 (선택사항)</label>
+                        <input type="text" class="form-control" id="session_name" name="session_name" 
+                               placeholder="예: 2024년 12월 처리" maxlength="200">
+                        <div class="form-text">비워두면 자동으로 날짜/시간으로 설정됩니다.</div>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>주의:</strong> 완료 후 현재 처리 데이터가 모두 삭제됩니다.<br>
+                        이력 저장을 선택하지 않으면 데이터를 다시 볼 수 없습니다.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check"></i> 완료 및 초기화
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <style>
-/* result.html 전용 스타일 */
+/* 기존 스타일 유지 */
 .search-box {
     max-width: 600px;
     margin: 0 auto 30px auto;
 }
 
-/* 통계 카드 스타일 */
 .stat-item {
     padding: 10px;
     border-radius: 8px;
@@ -383,7 +443,6 @@
     transition: width 0.8s ease;
 }
 
-/* 액션 버튼 스타일 개선 */
 .btn-lg {
     padding: 12px 20px;
     font-weight: 500;
@@ -464,7 +523,6 @@ code {
     font-size: 0.9em;
 }
 
-/* 로딩 상태 스타일 */
 .btn.loading {
     position: relative;
     pointer-events: none;
@@ -490,7 +548,6 @@ code {
     100% { transform: rotate(360deg); }
 }
 
-/* 신라 면세점 추가 정보 스타일 */
 .accordion-button strong {
     color: #0d6efd;
 }
@@ -499,7 +556,6 @@ code {
     font-weight: normal;
 }
 
-/* 버튼 그룹 스타일 */
 .btn-group .btn {
     font-size: 0.8em;
     padding: 4px 8px;
@@ -589,6 +645,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.className = originalClass;
                 this.style.pointerEvents = '';
             }
+        });
+    }
+
+    // 이력 저장 체크박스 변화 처리
+    const saveToHistoryCheck = document.getElementById('save_to_history');
+    const sessionNameGroup = document.getElementById('sessionNameGroup');
+    
+    if (saveToHistoryCheck && sessionNameGroup) {
+        saveToHistoryCheck.addEventListener('change', function() {
+            sessionNameGroup.style.display = this.checked ? 'block' : 'none';
         });
     }
 

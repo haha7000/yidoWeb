@@ -11,6 +11,8 @@ from app.services.shilla_matching import shilla_matching_result
 from app.services.GenerateReceiptForm import get_matched_name_and_payback
 from app.core.database import SessionLocal
 from app.models.models import User, Receipt, Passport, ReceiptMatchLog, DutyFreeType, ShillaReceipt
+from app.services.data_manager import DataManager
+from app.services.archive_service import ArchiveService
 from datetime import datetime
 from sqlalchemy.sql import text
 from sqlalchemy.orm import Session
@@ -146,11 +148,21 @@ async def logout(response: Response):
     return {"message": "로그아웃 성공"}
 
 @app.get("/upload/")
-def form(request: Request, current_user: User = Depends(get_current_user)):
-    return templates.TemplateResponse("input.html", {
+def form(
+    request: Request, 
+    completed: bool = False,
+    current_user: User = Depends(get_current_user)
+):
+    """업로드 페이지 - 완료 메시지 지원"""
+    context = {
         "request": request,
         "user": current_user
-    })
+    }
+    
+    if completed:
+        context["success_message"] = "이전 세션이 성공적으로 완료되었습니다. 새로운 처리를 시작하세요."
+    
+    return templates.TemplateResponse("input.html", context)
 
 @app.post("/upload-excel/")
 async def upload_excel(
@@ -548,12 +560,41 @@ async def result(
 @app.get("/result/")
 async def get_result(
     request: Request,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
-        # 기본적으로 롯데로 설정하되, 실제로는 사용자의 마지막 처리 타입을 확인해야 함
-        # 여기서는 간단히 롯데로 기본 설정
-        duty_free_type = "lotte"
+        # 사용자의 마지막 처리 타입을 확인
+        duty_free_type = "lotte"  # 기본값
+        
+        # 먼저 신라 데이터가 있는지 확인
+        try:
+            shilla_count_sql = text("""
+                SELECT COUNT(*) FROM shilla_receipts 
+                WHERE user_id = :user_id
+            """)
+            shilla_count = db.execute(shilla_count_sql, {"user_id": current_user.id}).scalar()
+            
+            if shilla_count > 0:
+                duty_free_type = "shilla"
+                print(f"신라 영수증 {shilla_count}개 발견, 신라 모드로 설정")
+            else:
+                # 롯데 데이터 확인
+                lotte_count_sql = text("""
+                    SELECT COUNT(*) FROM receipts 
+                    WHERE user_id = :user_id
+                """)
+                lotte_count = db.execute(lotte_count_sql, {"user_id": current_user.id}).scalar()
+                
+                if lotte_count > 0:
+                    duty_free_type = "lotte"
+                    print(f"롯데 영수증 {lotte_count}개 발견, 롯데 모드로 설정")
+                
+        except Exception as e:
+            print(f"테이블 조회 오류: {e}")
+            # 테이블이 없는 경우 기본값 유지
+        
+        print(f"결과 조회 - 사용자: {current_user.id}, 면세점 타입: {duty_free_type}")
         
         # 매칭된/안된 목록 조회
         matched, unmatched = fetch_results(current_user.id, duty_free_type)
@@ -590,20 +631,36 @@ async def generate_receipts(
     current_user: User = Depends(get_current_user)
 ):
     try:
-        # 사용자별 수령증 생성
+        print(f"사용자 {current_user.id}의 수령증 생성 시작...")
+        
+        # 사용자별 수령증 생성 (면세점 타입 자동 감지)
         receipt_dir = get_matched_name_and_payback(current_user.id)
+        
+        # 생성된 파일 개수 확인
+        if not os.path.exists(receipt_dir):
+            raise Exception("수령증 디렉토리가 생성되지 않았습니다.")
+        
+        files = [f for f in os.listdir(receipt_dir) if f.endswith('.xlsx')]
+        if not files:
+            raise Exception("생성된 수령증이 없습니다. 매칭된 데이터를 확인해주세요.")
+        
+        print(f"생성된 수령증 파일: {len(files)}개")
         
         # ZIP 파일로 압축
         zip_path = os.path.join(os.path.dirname(receipt_dir), "수령증_모음.zip")
         with zipfile.ZipFile(zip_path, 'w') as zipf:
             for root, dirs, files in os.walk(receipt_dir):
                 for file in files:
-                    file_path = os.path.join(root, file)
-                    arcname = os.path.relpath(file_path, os.path.dirname(receipt_dir))
-                    zipf.write(file_path, arcname)
+                    if file.endswith('.xlsx'):
+                        file_path = os.path.join(root, file)
+                        arcname = os.path.relpath(file_path, os.path.dirname(receipt_dir))
+                        zipf.write(file_path, arcname)
+                        print(f"ZIP에 추가: {file}")
         
         # 임시 파일들 정리
         shutil.rmtree(receipt_dir)
+        
+        print(f"수령증 ZIP 파일 생성 완료: {zip_path}")
         
         # 다운로드 제공
         return FileResponse(
@@ -613,6 +670,8 @@ async def generate_receipts(
         )
     except Exception as e:
         print(f"수령증 생성 중 오류 발생: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"수령증 생성 중 오류가 발생했습니다: {str(e)}")
 
 @app.get("/edit_unmatched/{receipt_id}")
@@ -1232,4 +1291,160 @@ async def get_available_passports(
     
 
 
+@app.post("/complete-session/")
+async def complete_session(
+    request: Request,
+    session_name: str = Form(""),
+    save_to_history: bool = Form(False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    현재 세션 완료 및 데이터 초기화
+    선택적으로 이력에 저장
+    """
+    try:
+        print(f"세션 완료 요청: 사용자={current_user.id}, 이력저장={save_to_history}, 세션명='{session_name}'")
+        
+        # 1. 현재 상태 확인
+        stats = DataManager.get_user_statistics(current_user.id)
+        print(f"현재 상태: {stats}")
+        
+        if stats["total_receipts"] == 0:
+            print("처리할 데이터가 없음")
+            return templates.TemplateResponse("result.html", {
+                "request": request,
+                "user": current_user,
+                "warning": "처리할 데이터가 없습니다.",
+                "results": [],
+                "unmatched_receipts": [],
+                "duty_free_type": "lotte"
+            })
+        
+        # 2. 이력 저장 (선택사항)
+        archive_success = True
+        if save_to_history:
+            print("이력 저장 시작...")
+            archive_service = ArchiveService()
+            
+            if session_name.strip():
+                final_session_name = session_name.strip()
+            else:
+                final_session_name = f"세션_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            
+            print(f"세션명: {final_session_name}")
+            archive_success = archive_service.save_current_session_to_history(
+                current_user.id, final_session_name
+            )
+            
+            if archive_success:
+                print("이력 저장 성공")
+            else:
+                print("이력 저장 실패")
+                return templates.TemplateResponse("result.html", {
+                    "request": request,
+                    "user": current_user,
+                    "error": "이력 저장 중 오류가 발생했습니다.",
+                    "results": [],
+                    "unmatched_receipts": [],
+                    "duty_free_type": stats.get("duty_free_type", "lotte")
+                })
+        
+        # 3. 현재 세션 데이터 초기화
+        print("세션 데이터 초기화 시작...")
+        clear_success = DataManager.clear_current_session_data(current_user.id)
+        
+        if clear_success:
+            print("세션 데이터 초기화 성공")
+            # 이력 저장했으면 이력 페이지로, 아니면 업로드 페이지로
+            if save_to_history and archive_success:
+                print("이력 페이지로 리다이렉트")
+                return RedirectResponse(url="/history/", status_code=302)
+            else:
+                print("업로드 페이지로 리다이렉트")
+                return RedirectResponse(url="/upload/?completed=true", status_code=302)
+        else:
+            print("세션 데이터 초기화 실패")
+            return templates.TemplateResponse("result.html", {
+                "request": request,
+                "user": current_user,
+                "error": "데이터 초기화 중 오류가 발생했습니다.",
+                "results": [],
+                "unmatched_receipts": [],
+                "duty_free_type": stats.get("duty_free_type", "lotte")
+            })
+            
+    except Exception as e:
+        print(f"세션 완료 처리 오류: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return templates.TemplateResponse("result.html", {
+            "request": request,
+            "user": current_user,
+            "error": f"처리 중 오류가 발생했습니다: {str(e)}",
+            "results": [],
+            "unmatched_receipts": [],
+            "duty_free_type": "lotte"
+        })
 
+@app.get("/history/")
+async def processing_history(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """처리 이력 조회 페이지"""
+    try:
+        archive_service = ArchiveService()
+        
+        # 아카이브된 세션 목록 조회
+        archives = archive_service.get_user_archives(current_user.id)
+        
+        return templates.TemplateResponse("history.html", {
+            "request": request,
+            "user": current_user,
+            "archives": archives
+        })
+        
+    except Exception as e:
+        print(f"이력 조회 오류: {str(e)}")
+        return templates.TemplateResponse("history.html", {
+            "request": request,
+            "user": current_user,
+            "error": f"이력 조회 중 오류가 발생했습니다: {str(e)}",
+            "archives": []
+        })
+
+@app.get("/history/search/")
+async def search_history(
+    request: Request,
+    q: str = "",
+    search_type: str = "all",  # all, customer, passport, receipt
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """이력 검색 API"""
+    try:
+        archive_service = ArchiveService()
+        
+        results = archive_service.search_matching_history(
+            user_id=current_user.id,
+            query=q,
+            search_type=search_type
+        )
+        
+        return {
+            "success": True,
+            "results": results,
+            "total": len(results)
+        }
+        
+    except Exception as e:
+        print(f"이력 검색 오류: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "results": [],
+            "total": 0
+        }
+    
