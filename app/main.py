@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Form, Depends, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
 import zipfile, tempfile, os, shutil
 from app.services.passportMatching import matching_passport, get_unmatched_passports, update_passport_matching_status
 from app.services.LotteFinder import LotteAiOcr
@@ -761,15 +761,15 @@ async def update_unmatched(
             old_receipt_number = receipt.receipt_number
             receipt.receipt_number = new_receipt_number
             
-            # 롯데 엑셀 데이터에서 검색
+            # 롯데 엑셀 데이터에서 검색 (이름과 여권정보 조회)
             sql = text("""
-                SELECT "receiptNumber"
+                SELECT "receiptNumber", name, "PayBack"
                 FROM lotte_excel_data
                 WHERE "receiptNumber" = :receipt_number
             """)
             result = db.execute(sql, {"receipt_number": new_receipt_number}).first()
             
-            # 매칭 로그 업데이트
+            # 매칭 로그 업데이트 (엑셀 이름 포함)
             match_log = db.query(ReceiptMatchLog).filter(
                 ReceiptMatchLog.receipt_number == old_receipt_number,
                 ReceiptMatchLog.user_id == current_user.id
@@ -778,14 +778,36 @@ async def update_unmatched(
             if match_log:
                 match_log.receipt_number = new_receipt_number
                 match_log.is_matched = result is not None
+                match_log.excel_name = result[1] if result else None  # 엑셀 이름 추가
+                
+                # 여권 정보도 추가 (엑셀 이름으로 여권 검색)
+                if result and result[1]:  # 엑셀에서 이름이 있으면
+                    passport_info = db.query(Passport).filter(
+                        Passport.name == result[1],
+                        Passport.user_id == current_user.id
+                    ).first()
+                    if passport_info:
+                        match_log.passport_number = passport_info.passport_number
+                        match_log.birthday = passport_info.birthday
             else:
+                # 새 로그 생성 시에도 엑셀 정보 포함
+                passport_info = None
+                if result and result[1]:
+                    passport_info = db.query(Passport).filter(
+                        Passport.name == result[1],
+                        Passport.user_id == current_user.id
+                    ).first()
+                    
                 new_match_log = ReceiptMatchLog(
                     user_id=current_user.id,
                     receipt_number=new_receipt_number,
-                    is_matched=result is not None
+                    is_matched=result is not None,
+                    excel_name=result[1] if result else None,
+                    passport_number=passport_info.passport_number if passport_info else None,
+                    birthday=passport_info.birthday if passport_info else None
                 )
                 db.add(new_match_log)
-            
+                    
             db.commit()
             return RedirectResponse(url="/result/", status_code=303)
         
@@ -1448,3 +1470,11 @@ async def search_history(
             "total": 0
         }
     
+
+@app.get("/fee/", response_class=HTMLResponse)
+async def fee_management_page(request: Request, current_user: User = Depends(get_current_user)):
+    """수수료 적용기준 관리 페이지"""
+    return templates.TemplateResponse("fee.html", {
+        "request": request,
+        "user": current_user
+    })

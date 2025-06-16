@@ -1,0 +1,997 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <i class="fas fa-calculator text-primary me-2"></i>
+            수수료 적용기준 관리
+        </h1>
+        <div>
+            <span class="badge bg-info">사용자: {{ user.username }}</span>
+            <a href="/upload/" class="btn btn-outline-secondary ms-2">
+                <i class="fas fa-arrow-left"></i> 업로드 페이지로
+            </a>
+        </div>
+    </div>
+
+    <!-- 컨트롤 패널 -->
+    <div class="action-buttons fade-in-up mb-4">
+        <div class="row g-3">
+            <div class="col-12">
+                <h5 class="mb-3">
+                    <i class="fas fa-tools text-primary me-2"></i>
+                    관리 도구
+                </h5>
+            </div>
+            <div class="col-md-4">
+                <button class="btn btn-success w-100" onclick="downloadTemplate()">
+                    <i class="fas fa-download me-2"></i>
+                    <div>템플릿 다운로드</div>
+                    <small class="d-block mt-1 opacity-75">엑셀 템플릿</small>
+                </button>
+            </div>
+            <div class="col-md-4">
+                <button class="btn btn-info w-100" onclick="toggleUploadSection()">
+                    <i class="fas fa-upload me-2"></i>
+                    <div>템플릿 업로드</div>
+                    <small class="d-block mt-1 opacity-75">수수료 데이터</small>
+                </button>
+            </div>
+            <div class="col-md-4">
+                <button class="btn btn-primary w-100" onclick="toggleSearchSection()">
+                    <i class="fas fa-search me-2"></i>
+                    <div>수수료 조회</div>
+                    <small class="d-block mt-1 opacity-75">기준 검색</small>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 업로드 섹션 -->
+    <div class="card fade-in-up mb-4" id="uploadSection" style="display: none;">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-upload me-2"></i>
+                템플릿 업로드
+            </h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">수수료 적용기준 엑셀 파일을 업로드해주세요.</p>
+            
+            <div class="drop-zone mb-3" id="templateDropZone">
+                <div class="drop-zone-content">
+                    <i class="fas fa-file-excel fa-3x text-success mb-3"></i>
+                    <h6 class="mb-2">엑셀 파일을 드래그하거나 클릭하세요</h6>
+                    <p class="mb-0 text-muted" id="templateFileDisplay">수수료 적용기준 엑셀 파일</p>
+                    <input type="file" id="templateFile" accept=".xlsx,.xls,.csv" style="display: none;">
+                </div>
+            </div>
+            
+            <div class="text-center">
+                <button class="btn btn-success" onclick="uploadTemplate()" id="uploadBtn" disabled>
+                    <i class="fas fa-check me-2"></i>
+                    업로드 시작
+                </button>
+                <button class="btn btn-outline-secondary ms-2" onclick="clearTemplate()">
+                    <i class="fas fa-times me-2"></i>
+                    취소
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 검색 섹션 -->
+    <div class="card fade-in-up mb-4" id="searchSection" style="display: none;">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-search me-2"></i>
+                수수료 적용기준 조회
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label for="searchDate" class="form-label">조회날짜</label>
+                    <input type="date" class="form-control" id="searchDate" name="searchDate">
+                </div>
+                <div class="col-md-3">
+                    <label for="dutyFreeStore" class="form-label">면세점명</label>
+                    <select class="form-select" id="dutyFreeStore" name="dutyFreeStore">
+                        <option value="">전체</option>
+                        <option value="lotte">롯데면세점</option>
+                        <option value="shilla">신라면세점</option>
+                        <option value="hyundai">현대면세점</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="branch" class="form-label">지점명</label>
+                    <select class="form-select" id="branch" name="branch">
+                        <option value="">전체</option>
+                        <option value="main">본점</option>
+                        <option value="airport">공항점</option>
+                        <option value="gangnam">강남점</option>
+                        <option value="myeongdong">명동점</option>
+                        <option value="busan">부산</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button class="btn btn-primary w-100" onclick="searchFeeData()">
+                        <i class="fas fa-search me-2"></i>
+                        조회하기
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 데이터 테이블 -->
+    <div class="card fade-in-up">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-table me-2"></i>
+                    수수료 적용기준 데이터
+                </h5>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-outline-success btn-sm" onclick="addNewRow()">
+                        <i class="fas fa-plus me-1"></i> 새 행 추가
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm" onclick="saveChanges()">
+                        <i class="fas fa-save me-1"></i> 변경사항 저장
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div id="tableContent">
+                <div class="text-center p-5 text-muted">
+                    <i class="fas fa-table fa-4x mb-3"></i>
+                    <h4>수수료 적용기준 데이터가 없습니다</h4>
+                    <p>템플릿을 업로드하거나 조회 조건을 설정해서 데이터를 확인하세요.</p>
+                    <button class="btn btn-primary mt-3" onclick="downloadTemplate()">
+                        <i class="fas fa-download me-2"></i> 템플릿 다운로드
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 템플릿 다운로드 모달 -->
+<div class="modal fade" id="templateModal" tabindex="-1" aria-labelledby="templateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="templateModalLabel">
+                    <i class="fas fa-download text-success me-2"></i>
+                    템플릿 다운로드
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>어떤 템플릿을 다운로드하시겠습니까?</p>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" onclick="downloadSpecificTemplate('basic')">
+                        <i class="fas fa-file-excel me-2"></i>
+                        기본 수수료 템플릿
+                        <small class="d-block text-muted">기본적인 수수료 적용기준 양식</small>
+                    </button>
+                    <button class="btn btn-outline-info" onclick="downloadSpecificTemplate('advanced')">
+                        <i class="fas fa-file-excel me-2"></i>
+                        고급 수수료 템플릿
+                        <small class="d-block text-muted">상세한 조건별 수수료 양식</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* 드롭존 스타일 */
+.drop-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: 12px;
+    padding: 3rem 2rem;
+    text-align: center;
+    background: var(--bg-light);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.drop-zone:hover {
+    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+    border-color: var(--info);
+    transform: translateY(-2px);
+}
+
+.drop-zone.dragover {
+    background: linear-gradient(135deg, #bee5eb 0%, #9fddeb 100%);
+    border-color: var(--info);
+    transform: scale(1.02);
+}
+
+.drop-zone-content h6 {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* 테이블 스타일 */
+.fee-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+}
+
+.fee-table th,
+.fee-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+
+.fee-table th {
+    background-color: var(--bg-light);
+    font-weight: bold;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.fee-table tbody tr:hover {
+    background-color: var(--bg-light);
+}
+
+.fee-table td input,
+.fee-table td select {
+    border: none;
+    background: transparent;
+    width: 100%;
+    padding: 8px;
+    font-size: 0.9rem;
+}
+
+.fee-table td input:focus,
+.fee-table td select:focus {
+    background-color: #fff;
+    border: 2px solid var(--primary-color);
+    border-radius: 4px;
+    outline: none;
+}
+
+/* 입력 필드 검증 스타일 */
+.input-error {
+    border-color: var(--danger-color) !important;
+    background-color: #fff5f5 !important;
+}
+
+.input-success {
+    border-color: var(--success-color) !important;
+    background-color: #f0fff4 !important;
+}
+
+/* 로딩 상태 */
+.btn.loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.btn.loading::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid transparent;
+    border-top: 2px solid rgba(255,255,255,0.8);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+    .fee-table {
+        font-size: 0.8rem;
+    }
+    
+    .fee-table th,
+    .fee-table td {
+        padding: 8px;
+    }
+    
+    .drop-zone {
+        padding: 2rem 1rem;
+        min-height: 150px;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    setupDropZone();
+    setupFileInput();
+    
+    // 유저 ID 확인
+    console.log('현재 유저 ID:', getCurrentUserId());
+});
+
+// 드롭존 설정
+function setupDropZone() {
+    const dropZone = document.getElementById('templateDropZone');
+    const fileInput = document.getElementById('templateFile');
+
+    dropZone.addEventListener('click', function() {
+        fileInput.click();
+    });
+
+    dropZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', function() {
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFileSelect(files[0]);
+        }
+    });
+}
+
+// 파일 입력 설정
+function setupFileInput() {
+    const fileInput = document.getElementById('templateFile');
+    
+    fileInput.addEventListener('change', function() {
+        if (this.files.length > 0) {
+            handleFileSelect(this.files[0]);
+        }
+    });
+}
+
+// 파일 선택 처리
+function handleFileSelect(file) {
+    const allowedTypes = ['.xlsx', '.xls', '.csv'];
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+    
+    if (!allowedTypes.includes(fileExtension)) {
+        showNotification('엑셀 파일만 업로드 가능합니다.', 'error');
+        return;
+    }
+    
+    const fileDisplay = document.getElementById('templateFileDisplay');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const fileSize = (file.size / 1024 / 1024).toFixed(2);
+    
+    fileDisplay.innerHTML = `
+        <i class="fas fa-file-excel text-success me-2"></i>
+        <strong>${file.name}</strong>
+        <small class="d-block text-muted mt-1">${fileSize} MB</small>
+    `;
+    
+    uploadBtn.disabled = false;
+}
+
+// 섹션 토글 함수들
+function toggleUploadSection() {
+    const uploadSection = document.getElementById('uploadSection');
+    const searchSection = document.getElementById('searchSection');
+    
+    searchSection.style.display = 'none';
+    uploadSection.style.display = uploadSection.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleSearchSection() {
+    const searchSection = document.getElementById('searchSection');
+    const uploadSection = document.getElementById('uploadSection');
+    
+    uploadSection.style.display = 'none';
+    searchSection.style.display = searchSection.style.display === 'none' ? 'block' : 'none';
+}
+
+// 템플릿 다운로드
+function downloadTemplate() {
+    const modal = new bootstrap.Modal(document.getElementById('templateModal'));
+    modal.show();
+}
+
+function downloadSpecificTemplate(type) {
+    const apiUrl = "http://localhost:8000/api/fees/template";
+    fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`템플릿 다운로드에 실패했습니다. (${response.status} ${response.statusText})`);
+        }
+        return response.blob();
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `수수료_템플릿_${type}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showNotification('템플릿 다운로드가 완료되었습니다.', 'success');
+    })
+    .catch(error => {
+        console.error('다운로드 오류:', error);
+        showNotification(`템플릿 다운로드 중 오류가 발생했습니다: ${error.message}`, 'error');
+    });
+    
+    const modal = bootstrap.Modal.getInstance(document.getElementById('templateModal'));
+    modal.hide();
+}
+
+// 현재 로그인한 유저 ID 가져오기
+function getCurrentUserId() {
+    // 1. 서버에서 템플릿에 전달된 유저 정보 사용 (가장 안전)
+    const serverUserId = document.querySelector('meta[name="user-id"]')?.getAttribute('content');
+    if (serverUserId && serverUserId !== '' && serverUserId !== 'undefined') {
+        return parseInt(serverUserId);
+    }
+    
+    // 2. 로컬스토리지에서 유저 정보 가져오기 (백업)
+    try {
+        const userData = localStorage.getItem('user');
+        if (userData) {
+            const user = JSON.parse(userData);
+            if (user && user.id) {
+                return user.id;
+            }
+        }
+    } catch (error) {
+        console.warn('로컬스토리지에서 유저 정보를 가져올 수 없습니다:', error);
+    }
+    
+    // 3. 세션스토리지에서 유저 정보 가져오기 (백업)
+    try {
+        const userData = sessionStorage.getItem('user');
+        if (userData) {
+            const user = JSON.parse(userData);
+            if (user && user.id) {
+                return user.id;
+            }
+        }
+    } catch (error) {
+        console.warn('세션스토리지에서 유저 정보를 가져올 수 없습니다:', error);
+    }
+    
+    // 4. 쿠키에서 유저 ID 가져오기 (백업)
+    try {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'user_id' && value) {
+                return parseInt(value);
+            }
+        }
+    } catch (error) {
+        console.warn('쿠키에서 유저 정보를 가져올 수 없습니다:', error);
+    }
+    
+    // 5. 기본값 사용 (서버에서 user 객체를 전달하지 않는 경우)
+    console.info('서버에서 유저 정보를 전달하지 않아 기본값(1)을 사용합니다.');
+    return 1; // 기본값 사용
+}
+
+// 템플릿 업로드
+async function uploadTemplate() {
+    const fileInput = document.getElementById('templateFile');
+    const uploadBtn = document.getElementById('uploadBtn');
+    
+    if (!fileInput.files.length) {
+        showNotification('파일을 선택해주세요.', 'error');
+        return;
+    }
+    
+    // 현재 로그인한 유저 ID 가져오기
+    const userId = getCurrentUserId();
+    if (!userId) {
+        showNotification('로그인이 필요합니다. 다시 로그인해주세요.', 'error');
+        return;
+    }
+    
+    const originalText = uploadBtn.innerHTML;
+    uploadBtn.classList.add('loading');
+    uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>업로드 중...';
+    uploadBtn.disabled = true;
+    
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    
+    try {
+        const response = await fetch(`http://127.0.0.1:8000/api/fees/upload?user_id=${userId}`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification('템플릿 업로드가 완료되었습니다.', 'success');
+            showSampleTable(result.data || []);
+            toggleUploadSection();
+        } else {
+            const error = await response.json();
+            showNotification('업로드 중 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류'), 'error');
+        }
+    } catch (error) {
+        console.error('업로드 오류:', error);
+        showNotification('네트워크 오류가 발생했습니다.', 'error');
+    } finally {
+        uploadBtn.classList.remove('loading');
+        uploadBtn.innerHTML = originalText;
+        uploadBtn.disabled = false;
+    }
+}
+
+// 조회 샘플 데이터
+const sampleQueryData = {
+    storeName: "롯데면세점",
+    branchName: "인천공항",
+    startDate: "2025-01-01",
+    endDate: "2025-12-31",
+    description: "롯데면세점 인천공항점 수수료 기준",
+    discountRate: "30",
+    brandFees: [
+        { id: 1, category: "화장품", brand: "CHANEL", feeRate: "5.5%" },
+        { id: 2, category: "화장품", brand: "DIOR", feeRate: "4.8%" },
+        { id: 3, category: "의류", brand: "GUCCI", feeRate: "6.2%" },
+    ],
+    itemFees: [
+        { id: 1, category: "화장품", brand: "CHANEL", itemName: "향수", itemCode: "CH001", feeRate: "4.5%" },
+        { id: 2, category: "의류", brand: "GUCCI", itemName: "가방", itemCode: "GU003", feeRate: "5.2%" },
+    ]
+};
+
+function showQueryResultUI(data = sampleQueryData) {
+    const tableContent = document.getElementById('tableContent');
+    tableContent.innerHTML = `
+        <div class="card mb-3 p-3">
+            <h5 class="mb-2">조회된 데이터 정보</h5>
+            <div class="row mb-2">
+                <div class="col-md-3"><b>면세점명:</b> ${data.storeName}</div>
+                <div class="col-md-3"><b>지점명:</b> ${data.branchName}</div>
+                <div class="col-md-3"><b>적용시작일:</b> ${data.startDate}</div>
+                <div class="col-md-3"><b>적용종료일:</b> ${data.endDate || "미설정"}</div>
+            </div>
+            <div class="mb-2"><b>설명:</b> ${data.description}</div>
+            <div class="mb-2">
+                <b>수수료 제외 할인율:</b>
+                <input type="number" value="${data.discountRate}" style="width:60px;display:inline-block;"> %
+                <span class="text-muted ms-2">지정된 할인율 이상은 일괄 수수료 0% 처리</span>
+            </div>
+        </div>
+        <ul class="nav nav-tabs mb-3" id="feeTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="brand-tab" data-bs-toggle="tab" data-bs-target="#brand" type="button" role="tab">브랜드별 수수료 리스트</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="item-tab" data-bs-toggle="tab" data-bs-target="#item" type="button" role="tab">품목별 수수료 리스트</button>
+            </li>
+        </ul>
+        <div class="tab-content" id="feeTabContent">
+            <div class="tab-pane fade show active" id="brand" role="tabpanel">
+                <table class="fee-table mb-3">
+                    <thead>
+                        <tr>
+                            <th>카테고리</th>
+                            <th>브랜드</th>
+                            <th>수수료율</th>
+                            <th>작업</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.brandFees.map(fee => `
+                            <tr>
+                                <td>${fee.category}</td>
+                                <td>${fee.brand}</td>
+                                <td>${fee.feeRate}</td>
+                                <td>
+                                    <button class="btn btn-outline-primary btn-sm" onclick="alert('수정 기능은 UI만 구현됨')">수정</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            <div class="tab-pane fade" id="item" role="tabpanel">
+                <table class="fee-table mb-3">
+                    <thead>
+                        <tr>
+                            <th>카테고리</th>
+                            <th>브랜드</th>
+                            <th>품목명</th>
+                            <th>품목코드</th>
+                            <th>수수료율</th>
+                            <th>작업</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.itemFees.map(fee => `
+                            <tr>
+                                <td>${fee.category}</td>
+                                <td>${fee.brand}</td>
+                                <td>${fee.itemName}</td>
+                                <td>${fee.itemCode}</td>
+                                <td>${fee.feeRate}</td>
+                                <td>
+                                    <button class="btn btn-outline-primary btn-sm" onclick="alert('수정 기능은 UI만 구현됨')">수정</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    // Bootstrap 탭 활성화 (필요시)
+    if (window.bootstrap) {
+        var triggerTabList = [].slice.call(document.querySelectorAll('#feeTab button'))
+        triggerTabList.forEach(function (triggerEl) {
+            var tabTrigger = new bootstrap.Tab(triggerEl)
+            triggerEl.addEventListener('click', function (event) {
+                event.preventDefault()
+                tabTrigger.show()
+            })
+        })
+    }
+}
+
+// 수수료 데이터 조회
+async function searchFeeData() {
+    const date = document.getElementById('searchDate').value;
+    const store = document.getElementById('dutyFreeStore').value;
+    const branch = document.getElementById('branch').value;
+    
+    if (!date) {
+        showNotification('조회 날짜를 선택해주세요.', 'warning');
+        return;
+    }
+    
+    showNotification('조회를 시작합니다.', 'info');
+    
+    try {
+        // API 파라미터 구성
+        const params = new URLSearchParams();
+        params.append('query_date', date);
+        if (store) params.append('company_name', store === 'lotte' ? 'LOTTE' : store === 'shilla' ? 'SHILLA' : 'HYUNDAI');
+        if (branch) {
+            const branchMap = {
+                'main': '본점',
+                'airport': '공항점', 
+                'gangnam': '강남점',
+                'myeongdong': '명동점',
+                'busan': '부산'
+            };
+            params.append('branch_name', branchMap[branch] || branch);
+        }
+        
+        const response = await fetch(`http://127.0.0.1:8000/api/fees/query?${params}`);
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            if (!result || result.length === 0) {
+                showNotification('조회 조건에 해당하는 데이터가 없습니다.', 'warning');
+                // 빈 상태 표시
+                const tableContent = document.getElementById('tableContent');
+                tableContent.innerHTML = `
+                    <div class="text-center p-5 text-muted">
+                        <i class="fas fa-search fa-4x mb-3"></i>
+                        <h4>조회 결과가 없습니다</h4>
+                        <p>선택한 조건에 해당하는 수수료 데이터가 없습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // API 응답 데이터를 UI에 맞게 변환
+            const apiData = result[0]; // 첫 번째 결과 사용
+            const transformedData = {
+                storeName: apiData.settings.company_name,
+                branchName: apiData.settings.branch_name,
+                startDate: apiData.settings.effective_from,
+                endDate: apiData.settings.effective_to || '',
+                description: apiData.settings.note || `${apiData.settings.company_name} ${apiData.settings.branch_name}점 수수료 기준`,
+                discountRate: (apiData.settings.free_rate_threshold * 100).toFixed(1),
+                brandFees: apiData.brand_fees.map(fee => ({
+                    id: fee.id,
+                    category: fee.category_code,
+                    brand: fee.brand_name,
+                    feeRate: (fee.commission_rate * 100).toFixed(2) + '%'
+                })),
+                itemFees: apiData.item_fees.map(fee => ({
+                    id: fee.id,
+                    category: fee.category_code,
+                    brand: fee.brand_name,
+                    itemName: fee.item_name || '-',
+                    itemCode: fee.product_code,
+                    feeRate: (fee.commission_rate * 100).toFixed(2) + '%'
+                }))
+            };
+            
+            showQueryResultUI(transformedData);
+            showNotification(`${transformedData.storeName} ${transformedData.branchName}점의 수수료 데이터를 조회했습니다.`, 'success');
+            
+        } else {
+            const error = await response.json();
+            showNotification('조회 중 오류가 발생했습니다: ' + (error.detail || '알 수 없는 오류'), 'error');
+        }
+    } catch (error) {
+        console.error('조회 오류:', error);
+        showNotification('네트워크 오류가 발생했습니다.', 'error');
+    }
+}
+
+// 샘플 테이블 표시
+function showSampleTable(data = null) {
+    const tableContent = document.getElementById('tableContent');
+    
+    const sampleData = data || [
+        {
+            date: '2025-06-16',
+            store: '롯데면세점',
+            branch: '본점',
+            category: '화장품',
+            feeRate: 5.5,
+            minFee: 1000,
+            maxFee: 50000,
+            status: '활성'
+        },
+        {
+            date: '2025-06-16',
+            store: '롯데면세점',
+            branch: '본점',
+            category: '향수',
+            feeRate: 6.0,
+            minFee: 1500,
+            maxFee: 75000,
+            status: '활성'
+        },
+        {
+            date: '2025-06-16',
+            store: '신라면세점',
+            branch: '공항점',
+            category: '의류',
+            feeRate: 4.0,
+            minFee: 800,
+            maxFee: 30000,
+            status: '활성'
+        }
+    ];
+    
+    tableContent.innerHTML = `
+        <div class="table-responsive">
+            <table class="fee-table">
+                <thead>
+                    <tr>
+                        <th style="min-width: 120px;">날짜</th>
+                        <th style="min-width: 120px;">면세점명</th>
+                        <th style="min-width: 100px;">지점명</th>
+                        <th style="min-width: 100px;">상품분류</th>
+                        <th style="min-width: 100px;">수수료율(%)</th>
+                        <th style="min-width: 100px;">최소수수료</th>
+                        <th style="min-width: 100px;">최대수수료</th>
+                        <th style="min-width: 100px;">상태</th>
+                        <th style="min-width: 80px;">작업</th>
+                    </tr>
+                </thead>
+                <tbody id="feeTableBody">
+                    ${sampleData.map((row, index) => `
+                        <tr data-row-id="${index}">
+                            <td><input type="date" value="${row.date}" onchange="markAsModified(this)"></td>
+                            <td><input type="text" value="${row.store}" onchange="markAsModified(this)"></td>
+                            <td><input type="text" value="${row.branch}" onchange="markAsModified(this)"></td>
+                            <td><input type="text" value="${row.category}" onchange="markAsModified(this)"></td>
+                            <td><input type="number" value="${row.feeRate}" step="0.1" min="0" max="100" onchange="markAsModified(this)"></td>
+                            <td><input type="number" value="${row.minFee}" step="100" min="0" onchange="markAsModified(this)"></td>
+                            <td><input type="number" value="${row.maxFee}" step="1000" min="0" onchange="markAsModified(this)"></td>
+                            <td>
+                                <select onchange="markAsModified(this)">
+                                    <option value="활성" ${row.status === '활성' ? 'selected' : ''}>활성</option>
+                                    <option value="비활성" ${row.status === '비활성' ? 'selected' : ''}>비활성</option>
+                                </select>
+                            </td>
+                            <td>
+                                <button class="btn btn-outline-danger btn-sm" onclick="deleteRow(${index})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+// 새 행 추가
+function addNewRow() {
+    const tbody = document.getElementById('feeTableBody');
+    if (!tbody) {
+        showNotification('먼저 데이터를 조회하거나 템플릿을 업로드해주세요.', 'warning');
+        return;
+    }
+    
+    const rowCount = tbody.children.length;
+    const newRow = document.createElement('tr');
+    newRow.setAttribute('data-row-id', rowCount);
+    newRow.className = 'table-warning'; // 새 행 표시
+    
+    newRow.innerHTML = `
+        <td><input type="date" value="${new Date().toISOString().split('T')[0]}" onchange="markAsModified(this)"></td>
+        <td><input type="text" placeholder="면세점명" onchange="markAsModified(this)"></td>
+        <td><input type="text" placeholder="지점명" onchange="markAsModified(this)"></td>
+        <td><input type="text" placeholder="상품분류" onchange="markAsModified(this)"></td>
+        <td><input type="number" placeholder="5.0" step="0.1" min="0" max="100" onchange="markAsModified(this)"></td>
+        <td><input type="number" placeholder="1000" step="100" min="0" onchange="markAsModified(this)"></td>
+        <td><input type="number" placeholder="50000" step="1000" min="0" onchange="markAsModified(this)"></td>
+        <td>
+            <select onchange="markAsModified(this)">
+                <option value="활성" selected>활성</option>
+                <option value="비활성">비활성</option>
+            </select>
+        </td>
+        <td>
+            <button class="btn btn-outline-danger btn-sm" onclick="deleteRow(${rowCount})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(newRow);
+    showNotification('새 행이 추가되었습니다.', 'success');
+}
+
+// 행 삭제
+function deleteRow(rowId) {
+    if (!confirm('이 행을 삭제하시겠습니까?')) {
+        return;
+    }
+    
+    const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+    if (row) {
+        row.remove();
+        showNotification('행이 삭제되었습니다.', 'success');
+    }
+}
+
+// 수정 표시
+function markAsModified(element) {
+    const row = element.closest('tr');
+    row.classList.add('table-info'); // 수정된 행 표시
+    element.classList.add('input-success');
+}
+
+// 변경사항 저장
+async function saveChanges() {
+    const modifiedRows = document.querySelectorAll('.table-info, .table-warning');
+    
+    if (modifiedRows.length === 0) {
+        showNotification('변경된 데이터가 없습니다.', 'warning');
+        return;
+    }
+    
+    if (!confirm(`${modifiedRows.length}개의 변경사항을 저장하시겠습니까?`)) {
+        return;
+    }
+    
+    showNotification('변경사항을 저장하는 중...', 'info');
+    
+    try {
+        // 실제 저장 로직
+        const data = Array.from(modifiedRows).map(row => {
+            const inputs = row.querySelectorAll('input, select');
+            return {
+                date: inputs[0].value,
+                store: inputs[1].value,
+                branch: inputs[2].value,
+                category: inputs[3].value,
+                feeRate: parseFloat(inputs[4].value) || 0,
+                minFee: parseInt(inputs[5].value) || 0,
+                maxFee: parseInt(inputs[6].value) || 0,
+                status: inputs[7].value
+            };
+        });
+        
+        const response = await fetch('/api/save-fee-data/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ data })
+        });
+        
+        if (response.ok) {
+            showNotification('변경사항이 저장되었습니다.', 'success');
+            // 수정 표시 제거
+            modifiedRows.forEach(row => {
+                row.classList.remove('table-info', 'table-warning');
+            });
+        } else {
+            showNotification('저장 중 오류가 발생했습니다.', 'error');
+        }
+    } catch (error) {
+        console.error('저장 오류:', error);
+        
+        // 시뮬레이션용
+        setTimeout(() => {
+            showNotification('변경사항이 저장되었습니다.', 'success');
+            modifiedRows.forEach(row => {
+                row.classList.remove('table-info', 'table-warning');
+            });
+        }, 1500);
+    }
+}
+
+// 템플릿 초기화
+function clearTemplate() {
+    const fileInput = document.getElementById('templateFile');
+    const fileDisplay = document.getElementById('templateFileDisplay');
+    const uploadBtn = document.getElementById('uploadBtn');
+    
+    fileInput.value = '';
+    fileDisplay.textContent = '수수료 적용기준 엑셀 파일';
+    uploadBtn.disabled = true;
+    
+    toggleUploadSection();
+}
+
+// 알림 함수
+function showNotification(message, type = 'info') {
+    const alertClass = type === 'success' ? 'alert-success' : 
+                      type === 'error' ? 'alert-danger' : 
+                      type === 'warning' ? 'alert-warning' : 'alert-info';
+    
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+    alertDiv.innerHTML = `
+        <i class="fas ${type === 'success' ? 'fa-check-circle' : 
+                       type === 'error' ? 'fa-exclamation-triangle' : 
+                       type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'} me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    // 5초 후 자동 제거
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

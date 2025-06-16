@@ -50,11 +50,11 @@
                 </button>
             </div>
             <div class="col-md-3 col-sm-6">
-                <a href="/unmatched-passports/" class="btn btn-outline-secondary w-100">
-                    <i class="fas fa-passport me-2"></i>
-                    <div>여권 관리</div>
-                    <small class="d-block mt-1 opacity-75">매칭 확인</small>
-                </a>
+                <button type="button" class="btn btn-info w-100" onclick="goToFeeManagement()">
+                    <i class="fas fa-calculator me-2"></i>
+                    <div>수수료 관리</div>
+                    <small class="d-block mt-1 opacity-75">적용기준 설정</small>
+                </button>
             </div>
         </div>
     </div>
@@ -656,6 +656,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // 수수료 관리 페이지로 이동
+    function goToFeeManagement() {
+        window.location.href = '/fee/';
+    }
+
     // 폼 제출
     uploadForm.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -763,8 +768,36 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // 알림 함수
+    function showNotification(message, type = 'info') {
+        const alertClass = type === 'success' ? 'alert-success' : 
+                          type === 'error' ? 'alert-danger' : 
+                          type === 'warning' ? 'alert-warning' : 'alert-info';
+        
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+        alertDiv.innerHTML = `
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : 
+                           type === 'error' ? 'fa-exclamation-triangle' : 
+                           type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'} me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        // 5초 후 자동 제거
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+
     // 전역 함수로 노출
     window.checkProcessingStatus = checkProcessingStatus;
+    window.goToFeeManagement = goToFeeManagement;
 });
 </script>
 {% endblock %}
