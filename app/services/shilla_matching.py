@@ -176,7 +176,8 @@ def shilla_matching_result(user_id):
                     discount_amount_krw=safe_float(discount_amount_krw) if is_matched else None,
                     sales_price_usd=safe_float(sales_price_usd) if is_matched else None,
                     net_sales_krw=safe_float(net_sales_krw) if is_matched else None,
-                    store_branch=store_branch if is_matched else None
+                    store_branch=store_branch if is_matched else None,
+                    duty_free_type="shilla"  # 신라 면세점
                 )
                 session.add(match_log)
                 print(f"새 매칭 로그 생성: {receipt_number} (매칭={is_matched})")

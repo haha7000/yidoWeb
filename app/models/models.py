@@ -105,6 +105,13 @@ class ReceiptMatchLog(Base):
     sales_price_usd = Column(Float, nullable=True)  # 판매가(달러)
     net_sales_krw = Column(Float, nullable=True)  # 순매출액(원)
     store_branch = Column(String(100), nullable=True)  # 점포구분 (롯데: 점구분, 신라: 점)
+    
+    # 할인율 및 수수료 계산 컬럼들
+    discount_rate = Column(DECIMAL(5,2), nullable=True)  # 할인율 (%)
+    commission_fee = Column(DECIMAL(12,2), nullable=True)  # 계산된 수수료 (원)
+    
+    # 면세점 타입 (lotte, shilla)
+    duty_free_type = Column(String(20), nullable=True)  # 면세점 타입
 
 class UnrecognizedImage(Base):
     __tablename__ = "unrecognized_images"

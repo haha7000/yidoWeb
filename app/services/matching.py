@@ -94,7 +94,8 @@ def matchingResult(user_id):
                 discount_amount_krw=safe_float(discount_amount_krw) if is_matched else None,
                 sales_price_usd=safe_float(sales_price_usd) if is_matched else None,
                 net_sales_krw=safe_float(net_sales_krw) if is_matched else None,
-                store_branch=store_branch if is_matched else None
+                store_branch=store_branch if is_matched else None,
+                duty_free_type="lotte"  # 롯데 면세점
             )
             session.add(match_log)
 

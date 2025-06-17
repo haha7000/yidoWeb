@@ -1634,3 +1634,100 @@ async def fee_management_page(request: Request, current_user: User = Depends(get
         "request": request,
         "user": current_user
     })
+
+# ============ 할인율 및 수수료 계산 API ============
+
+@app.post("/api/calculate-commission")
+async def calculate_commission_api(current_user: User = Depends(get_current_user)):
+    """할인율과 수수료를 계산하여 데이터베이스에 저장"""
+    try:
+        from app.services.commission_service import calculate_discounts_and_commissions
+        
+        # 현재 사용자의 데이터만 계산
+        result = calculate_discounts_and_commissions(user_id=current_user.id)
+        
+        if result["success"]:
+            return {
+                "success": True,
+                "message": result["message"],
+                "data": {
+                    "processed_count": result["processed_count"],
+                    "error_count": result.get("error_count", 0),
+                    "total_records": result.get("total_records", 0)
+                }
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result["message"])
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"할인율 및 수수료 계산 중 오류가 발생했습니다: {str(e)}")
+
+@app.get("/api/commission-summary")
+async def get_commission_summary_api(current_user: User = Depends(get_current_user)):
+    """수수료 계산 결과 요약 조회"""
+    try:
+        from app.services.commission_service import get_commission_summary
+        
+        # 현재 사용자의 데이터 요약
+        result = get_commission_summary(user_id=current_user.id)
+        
+        if result["success"]:
+            return {
+                "success": True,
+                "data": result["summary"]
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result["message"])
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"수수료 요약 조회 중 오류가 발생했습니다: {str(e)}")
+
+@app.get("/api/commission-details")
+async def get_commission_details_api(current_user: User = Depends(get_current_user)):
+    """할인율과 수수료가 계산된 상세 데이터 조회"""
+    try:
+        db = SessionLocal()
+        
+        # 매칭된 데이터 중 할인율 또는 수수료가 계산된 데이터 조회
+        query = text("""
+            SELECT 
+                id, receipt_number, excel_name, sales_date, category, brand, 
+                product_code, discount_amount_krw, sales_price_usd, net_sales_krw, 
+                store_branch, discount_rate, commission_fee
+            FROM receipt_match_log 
+            WHERE user_id = :user_id 
+            AND is_matched = TRUE
+            AND (discount_rate IS NOT NULL OR commission_fee IS NOT NULL)
+            ORDER BY sales_date DESC, receipt_number
+        """)
+        
+        results = db.execute(query, {"user_id": current_user.id}).fetchall()
+        db.close()
+        
+        # 결과를 JSON 형태로 변환
+        details = []
+        for row in results:
+            details.append({
+                "id": row.id,
+                "receipt_number": row.receipt_number,
+                "excel_name": row.excel_name,
+                "sales_date": row.sales_date.isoformat() if row.sales_date else None,
+                "category": row.category,
+                "brand": row.brand,
+                "product_code": row.product_code,
+                "discount_amount_krw": float(row.discount_amount_krw) if row.discount_amount_krw else None,
+                "sales_price_usd": float(row.sales_price_usd) if row.sales_price_usd else None,
+                "net_sales_krw": float(row.net_sales_krw) if row.net_sales_krw else None,
+                "store_branch": row.store_branch,
+                "discount_rate": float(row.discount_rate) if row.discount_rate else None,
+                "commission_fee": float(row.commission_fee) if row.commission_fee else None
+            })
+        
+        return {
+            "success": True,
+            "data": details,
+            "total_count": len(details)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"수수료 상세 조회 중 오류가 발생했습니다: {str(e)}")
