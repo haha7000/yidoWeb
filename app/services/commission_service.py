@@ -86,17 +86,13 @@ class CommissionService:
         """단일 레코드에 대해 할인율과 수수료를 계산하고 업데이트"""
         record_id, user_id, receipt_number, discount_amount_krw, sales_price_usd, net_sales_krw, sales_date, category, brand, product_code, store_branch, duty_free_type = row
         
-        # 1. 할인율 계산: (할인액 / 판매가) × 100
+        # 1. 할인율 계산: (할인액 / 순매출액) × 100
         discount_rate = None
-        if discount_amount_krw and sales_price_usd and sales_price_usd > 0:
-            # 환율 고려하여 계산 (USD를 KRW로 변환하거나 비율로 계산)
-            # 현재는 원화 할인액과 달러 판매가 비교이므로 비율로 계산
-            # 간단하게 할인액/순매출액 비율로 계산하여 %로 변환
-            if net_sales_krw and net_sales_krw > 0:
-                discount_rate = (float(discount_amount_krw) / float(net_sales_krw)) * 100
-                discount_rate = round(discount_rate, 2)
+        if discount_amount_krw and net_sales_krw and net_sales_krw > 0:
+            discount_rate = (float(discount_amount_krw) / float(net_sales_krw)) * 100
+            discount_rate = round(discount_rate, 2)
         
-        # 2. 수수료 계산
+        # 2. 수수료 계산 (할인율을 전달하여 free_rate_threshold 체크)
         commission_fee = None
         commission_rate = self._get_commission_rate(
             sales_date=sales_date,
@@ -105,10 +101,11 @@ class CommissionService:
             category=category,
             brand=brand,
             product_code=product_code,
-            duty_free_type=duty_free_type  # 면세점 타입 추가
+            duty_free_type=duty_free_type,
+            discount_rate=discount_rate  # 할인율 전달 추가
         )
         
-        if commission_rate and net_sales_krw:
+        if commission_rate is not None and net_sales_krw:
             commission_fee = float(net_sales_krw) * float(commission_rate)
             commission_fee = round(commission_fee, 2)
         
@@ -130,12 +127,14 @@ class CommissionService:
     
     def _get_commission_rate(self, sales_date, user_id: int, store_branch: str, 
                            category: str, brand: str, product_code: str, 
-                           duty_free_type: str = None) -> Optional[Decimal]:
+                           duty_free_type: str = None, discount_rate: float = None) -> Optional[Decimal]:
         """
         우선순위별로 수수료율을 조회
         1순위: product_code → item_fees
         2순위: brand → brand_fees  
         3순위: category → category_fees
+        
+        할인율이 free_rate_threshold 이상이면 수수료 0% 적용
         """
         
         # 면세점명 매핑 (duty_free_type 우선, 없으면 store_branch에서 추정)
@@ -172,13 +171,10 @@ class CommissionService:
         settings_id, free_rate_threshold = settings_result
         
         # 수수료 제외 임계값 확인 (할인율이 임계값 이상이면 수수료 0%)
-        current_discount_rate = None
-        if hasattr(self, '_current_discount_rate'):
-            current_discount_rate = self._current_discount_rate
-        
-        if current_discount_rate and free_rate_threshold:
-            if current_discount_rate >= float(free_rate_threshold) * 100:  # 임계값이 소수점이므로 100을 곱함
-                logger.info(f"할인율 {current_discount_rate}%가 임계값 {float(free_rate_threshold)*100}% 이상이므로 수수료 0%")
+        if discount_rate is not None and free_rate_threshold is not None:
+            threshold_percent = float(free_rate_threshold) * 100  # 소수점을 퍼센트로 변환
+            if discount_rate >= threshold_percent:
+                logger.info(f"할인율 {discount_rate}%가 임계값 {threshold_percent}% 이상이므로 수수료 0% 적용")
                 return Decimal('0.0')
         
         # 1순위: product_code로 item_fees 조회
