@@ -1,166 +1,109 @@
-# migration_fix_user_isolation.py
+# debug_shilla_matching.py - 신라 매칭 상태 디버깅
 from app.core.database import my_engine
 from sqlalchemy import text
-from datetime import datetime
 
-print("📦 사용자별 데이터 격리 강화 마이그레이션 시작...")
-
-with my_engine.connect() as conn:
-    try:
-        # 트랜잭션 시작
-        conn.execute(text("BEGIN"))
+def debug_shilla_matching_status(user_id, receipt_number=None):
+    """신라 매칭 상태를 자세히 분석하는 함수"""
+    print(f"🔍 신라 매칭 상태 디버깅 - 사용자 {user_id}")
+    
+    with my_engine.connect() as conn:
         
-        print("✅ 1단계: 기존 데이터 상태 확인")
-        
-        # 기존 데이터 통계 조회
-        try:
-            stats_queries = [
-                ("users", "SELECT COUNT(*) FROM users"),
-                ("receipts", "SELECT COUNT(*) FROM receipts"),
-                ("shilla_receipts", "SELECT COUNT(*) FROM shilla_receipts"),
-                ("passports", "SELECT COUNT(*) FROM passports"),
-                ("receipt_match_log", "SELECT COUNT(*) FROM receipt_match_log")
-            ]
-            
-            for table_name, query in stats_queries:
-                try:
-                    count = conn.execute(text(query)).scalar()
-                    print(f"   - {table_name}: {count}개 레코드")
-                except Exception as e:
-                    print(f"   - {table_name}: 테이블 없음 또는 오류 ({e})")
-                    
-        except Exception as e:
-            print(f"   ⚠️ 기존 데이터 조회 중 오류: {e}")
-        
-        print("✅ 2단계: 외래키 제약조건 강화")
-        
-        # receipt_match_log 테이블에 user_id가 없다면 추가
-        try:
-            # user_id 컬럼이 이미 있는지 확인
-            check_column = """
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'receipt_match_log' AND column_name = 'user_id'
-            """
-            column_exists = conn.execute(text(check_column)).fetchone()
-            
-            if not column_exists:
-                print("   - receipt_match_log 테이블에 user_id 컬럼 추가")
-                add_user_id = """
-                ALTER TABLE receipt_match_log 
-                ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
-                """
-                conn.execute(text(add_user_id))
-                
-                # 기존 데이터에 user_id 할당 (첫 번째 사용자로)
-                update_user_id = """
-                UPDATE receipt_match_log 
-                SET user_id = (SELECT MIN(id) FROM users LIMIT 1)
-                WHERE user_id IS NULL;
-                """
-                conn.execute(text(update_user_id))
-                
-                # NOT NULL 제약조건 추가
-                alter_not_null = """
-                ALTER TABLE receipt_match_log 
-                ALTER COLUMN user_id SET NOT NULL;
-                """
-                conn.execute(text(alter_not_null))
-                print("   ✅ receipt_match_log.user_id 컬럼 추가 완료")
-            else:
-                print("   ✅ receipt_match_log.user_id 컬럼 이미 존재")
-                
-        except Exception as e:
-            print(f"   ⚠️ receipt_match_log 컬럼 추가 중 오류: {e}")
-        
-        print("✅ 3단계: 인덱스 최적화")
-        
-        # 사용자별 조회 성능을 위한 인덱스 추가
-        performance_indexes = [
-            "CREATE INDEX IF NOT EXISTS idx_receipts_user_id ON receipts(user_id);",
-            "CREATE INDEX IF NOT EXISTS idx_shilla_receipts_user_id ON shilla_receipts(user_id);",
-            "CREATE INDEX IF NOT EXISTS idx_passports_user_id ON passports(user_id);",
-            "CREATE INDEX IF NOT EXISTS idx_passports_user_matched ON passports(user_id, is_matched);",
-            "CREATE INDEX IF NOT EXISTS idx_receipt_match_log_user_id ON receipt_match_log(user_id);",
-            "CREATE INDEX IF NOT EXISTS idx_receipt_match_log_user_receipt ON receipt_match_log(user_id, receipt_number);",
-            "CREATE INDEX IF NOT EXISTS idx_unrecognized_images_user_id ON unrecognized_images(user_id);"
-        ]
-        
-        for idx_sql in performance_indexes:
-            try:
-                conn.execute(text(idx_sql))
-            except Exception as e:
-                print(f"   ⚠️ 인덱스 생성 중 오류 (테이블 없을 수 있음): {e}")
-                
-        print("   ✅ 성능 인덱스 생성 완료")
-        
-        print("✅ 4단계: 데이터 정합성 확인")
-        
-        # orphaned 데이터 정리 (user_id가 없거나 잘못된 데이터)
-        cleanup_queries = [
-            # 존재하지 않는 user_id를 참조하는 데이터 정리
-            "DELETE FROM receipts WHERE user_id NOT IN (SELECT id FROM users);",
-            "DELETE FROM shilla_receipts WHERE user_id NOT IN (SELECT id FROM users);",
-            "DELETE FROM passports WHERE user_id NOT IN (SELECT id FROM users);",
-            "DELETE FROM receipt_match_log WHERE user_id NOT IN (SELECT id FROM users);",
-            "DELETE FROM unrecognized_images WHERE user_id NOT IN (SELECT id FROM users);"
-        ]
-        
-        total_cleaned = 0
-        for cleanup_sql in cleanup_queries:
-            try:
-                result = conn.execute(text(cleanup_sql))
-                cleaned_count = result.rowcount
-                total_cleaned += cleaned_count
-                if cleaned_count > 0:
-                    print(f"   - 정리된 레코드: {cleaned_count}개")
-            except Exception as e:
-                print(f"   ⚠️ 데이터 정리 중 오류: {e}")
-                
-        if total_cleaned == 0:
-            print("   ✅ 모든 데이터가 정상 상태입니다.")
+        # 1. 특정 영수증이 있다면 해당 영수증만, 없다면 모든 영수증 조회
+        if receipt_number:
+            where_clause = f"AND sr.receipt_number = '{receipt_number}'"
+            print(f"🎯 특정 영수증 조회: {receipt_number}")
         else:
-            print(f"   ✅ 총 {total_cleaned}개의 orphaned 레코드를 정리했습니다.")
+            where_clause = ""
+            print("📋 모든 영수증 조회")
         
-        print("✅ 5단계: 마이그레이션 기록 저장")
+        # 신라 영수증과 관련된 모든 정보 조회
+        debug_sql = f"""
+        SELECT 
+            sr.receipt_number,
+            sr.passport_number as receipt_passport,
+            se.passport_number as excel_passport,
+            se.name as excel_name,
+            p.name as passport_name,
+            p.passport_number as passport_passport,
+            p.is_matched as passport_is_matched,
+            CASE 
+                WHEN p.passport_number IS NOT NULL AND p.is_matched = TRUE THEN 'passport_matched'
+                WHEN p.passport_number IS NOT NULL AND p.is_matched = FALSE THEN 'passport_needs_update'  
+                WHEN p.passport_number IS NULL AND (sr.passport_number IS NOT NULL OR se.passport_number IS NOT NULL) THEN 'passport_missing'
+                WHEN p.passport_number IS NULL AND sr.passport_number IS NULL AND se.passport_number IS NULL THEN 'passport_not_provided'
+                ELSE 'passport_unknown'
+            END as passport_status
+        FROM shilla_receipts sr
+        LEFT JOIN shilla_excel_data se ON se."receiptNumber"::text = sr.receipt_number
+        LEFT JOIN passports p ON (
+            sr.passport_number = p.passport_number 
+            OR se.passport_number = p.passport_number
+        ) AND p.user_id = :user_id
+        WHERE sr.user_id = :user_id {where_clause}
+        ORDER BY sr.receipt_number
+        """
         
-        # 마이그레이션 실행 기록 저장 (간단한 로그)
-        try:
-            migration_log = f"""
-            INSERT INTO processing_archives (
-                user_id, session_name, archive_date, notes, archive_data
-            ) VALUES (
-                (SELECT MIN(id) FROM users),
-                'MIGRATION_LOG_USER_ISOLATION',
-                NOW(),
-                '사용자별 데이터 격리 강화 마이그레이션 완료',
-                '{"migration_date": "' || NOW()::text || '", "cleaned_records": ' || {total_cleaned} || '}'::jsonb
-            );
-            """
-            conn.execute(text(migration_log))
-            print("   ✅ 마이그레이션 로그 저장 완료")
-        except Exception as e:
-            print(f"   ⚠️ 마이그레이션 로그 저장 실패: {e}")
+        results = conn.execute(text(debug_sql), {"user_id": user_id}).fetchall()
         
-        # 커밋
-        conn.execute(text("COMMIT"))
-        print("✅ 마이그레이션 커밋 완료")
+        print(f"\n📊 조회 결과: {len(results)}개")
+        print("=" * 120)
         
-    except Exception as e:
-        # 롤백
-        conn.execute(text("ROLLBACK"))
-        print(f"❌ 마이그레이션 실패, 롤백됨: {e}")
-        raise e
+        for i, row in enumerate(results, 1):
+            (receipt_num, receipt_passport, excel_passport, excel_name, 
+             passport_name, passport_passport, passport_is_matched, passport_status) = row
+            
+            print(f"\n🎫 {i}. 영수증: {receipt_num}")
+            print(f"   📄 영수증 여권번호: {receipt_passport or 'None'}")
+            print(f"   📊 엑셀 여권번호:   {excel_passport or 'None'}")
+            print(f"   📊 엑셀 이름:       {excel_name or 'None'}")
+            print(f"   🛂 여권 이름:       {passport_name or 'None'}")
+            print(f"   🛂 여권 여권번호:   {passport_passport or 'None'}")
+            print(f"   🛂 여권 매칭상태:   {passport_is_matched}")
+            print(f"   🎯 최종 상태:       {passport_status}")
+            
+            # 매칭 분석
+            print(f"   📝 매칭 분석:")
+            if receipt_passport and passport_passport:
+                if receipt_passport == passport_passport:
+                    print(f"      ✅ 영수증-여권 매칭: {receipt_passport} == {passport_passport}")
+                else:
+                    print(f"      ❌ 영수증-여권 불일치: {receipt_passport} != {passport_passport}")
+            
+            if excel_passport and passport_passport:
+                if excel_passport == passport_passport:
+                    print(f"      ✅ 엑셀-여권 매칭: {excel_passport} == {passport_passport}")
+                else:
+                    print(f"      ❌ 엑셀-여권 불일치: {excel_passport} != {passport_passport}")
+            
+            # 문제점 분석
+            if passport_status == 'passport_needs_update':
+                print(f"   ⚠️  문제 분석:")
+                print(f"      - 여권번호는 매칭되지만 is_matched=FALSE인 상태")
+                print(f"      - 이는 여권 테이블의 is_matched 필드가 업데이트되지 않았음을 의미")
+            
+            print("-" * 120)
+        
+        # 여권 테이블 상태 확인
+        print(f"\n🛂 여권 테이블 상태 확인:")
+        passport_sql = """
+        SELECT 
+            name, 
+            passport_number, 
+            is_matched,
+            birthday
+        FROM passports 
+        WHERE user_id = :user_id
+        ORDER BY name
+        """
+        passport_results = conn.execute(text(passport_sql), {"user_id": user_id}).fetchall()
+        
+        for name, passport_num, is_matched, birthday in passport_results:
+            print(f"   👤 {name}: {passport_num} (매칭: {is_matched}) - 생일: {birthday}")
 
-print("📦 사용자별 데이터 격리 강화 마이그레이션 완료!")
-print("")
-print("💡 적용된 개선사항:")
-print("   ✅ 모든 테이블에 user_id 외래키 제약조건 강화")
-print("   ✅ 성능 최적화를 위한 인덱스 추가")
-print("   ✅ orphaned 데이터 정리")
-print("   ✅ 사용자별 완전한 데이터 격리 보장")
-print("")
-print("💡 이제 다음 기능들이 정상 작동합니다:")
-print("   - 사용자별 독립적인 처리 결과")
-print("   - 처리 완료 후 데이터 초기화")
-print("   - 이력 저장 및 검색 기능")
+# 사용 예시
+if __name__ == "__main__":
+    # 특정 사용자의 매칭 상태 확인
+    debug_shilla_matching_status(user_id=2)
+    
+    # 또는 특정 영수증만 확인
+    # debug_shilla_matching_status(user_id=2, receipt_number="0124502900965")

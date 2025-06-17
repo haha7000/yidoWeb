@@ -1,6 +1,6 @@
-# app/models/models.py - 아카이브 모델 추가된 버전
+# app/models/models.py - DECIMAL import 추가된 버전
 
-from sqlalchemy import Column, Integer, String, Text, Boolean, Date, ForeignKey, TIMESTAMP, func, Float, Enum
+from sqlalchemy import Column, Integer, String, Text, Boolean, Date, ForeignKey, TIMESTAMP, func, Float, Enum, DECIMAL
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.dialects.postgresql import JSONB
 from passlib.context import CryptContext
@@ -90,9 +90,20 @@ class ReceiptMatchLog(Base):
     receipt_number = Column(Text, nullable=True)
     is_matched = Column(Boolean, nullable=False)
     checked_at = Column(TIMESTAMP, server_default=func.now())
+    
+    # 기존 컬럼들
     excel_name = Column(String(100), nullable=True)
     passport_number = Column(String(20), nullable=True)
     birthday = Column(Date, nullable=True)
+    
+    # 새로 추가된 매출 상세 정보 컬럼들 (간단하게)
+    sales_date = Column(Date, nullable=True)  # 매출일자
+    category = Column(String(100), nullable=True)  # 카테고리
+    brand = Column(String(100), nullable=True)  # 브랜드
+    product_code = Column(String(50), nullable=True)  # 상품코드
+    discount_amount_krw = Column(Float, nullable=True)  # 할인액(원)
+    sales_price_usd = Column(Float, nullable=True)  # 판매가(달러)
+    net_sales_krw = Column(Float, nullable=True)  # 순매출액(원)
 
 class UnrecognizedImage(Base):
     __tablename__ = "unrecognized_images"

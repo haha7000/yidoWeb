@@ -1,80 +1,52 @@
-# migration_add_archive_tables.py
+# migration_add_simple_columns.py
 from app.core.database import my_engine
-from app.models.models import Base
 from sqlalchemy import text
 
-print("📦 아카이브 테이블 추가 마이그레이션 시작...")
+print("📦 receipt_match_log 테이블에 간단한 컬럼들만 추가...")
 
 with my_engine.connect() as conn:
     try:
         # 트랜잭션 시작
         conn.execute(text("BEGIN"))
         
-        print("✅ 1단계: 아카이브 테이블 생성")
+        print("✅ 기존 additional_data 컬럼 제거 (있다면)")
+        try:
+            conn.execute(text("ALTER TABLE receipt_match_log DROP COLUMN IF EXISTS additional_data"))
+            print("   ✅ additional_data 컬럼 제거 완료")
+        except Exception as e:
+            print(f"   ⚠️ additional_data 컬럼 제거 중 오류: {e}")
         
-        # 1. processing_archives 테이블 생성
-        create_archives_table = """
-        CREATE TABLE IF NOT EXISTS processing_archives (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            session_name VARCHAR(200) NOT NULL,
-            archive_date TIMESTAMP DEFAULT NOW(),
-            total_receipts INTEGER DEFAULT 0,
-            matched_receipts INTEGER DEFAULT 0,
-            total_passports INTEGER DEFAULT 0,
-            matched_passports INTEGER DEFAULT 0,
-            duty_free_type VARCHAR(20),
-            notes TEXT,
-            archive_data JSONB
-        );
-        """
-        conn.execute(text(create_archives_table))
-        print("   ✅ processing_archives 테이블 생성 완료")
+        print("✅ 기존 컬럼들이 있는지 확인 후 누락된 것만 추가")
         
-        # 2. matching_history 테이블 생성
-        create_history_table = """
-        CREATE TABLE IF NOT EXISTS matching_history (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            archive_id INTEGER REFERENCES processing_archives(id) ON DELETE SET NULL,
-            customer_name VARCHAR(100),
-            passport_number VARCHAR(20),
-            receipt_numbers TEXT,
-            excel_data JSONB,
-            match_status VARCHAR(50),
-            created_at TIMESTAMP DEFAULT NOW()
-        );
-        """
-        conn.execute(text(create_history_table))
-        print("   ✅ matching_history 테이블 생성 완료")
-        
-        print("✅ 2단계: 인덱스 생성")
-        
-        # 3. 성능을 위한 인덱스 생성
-        indexes = [
-            "CREATE INDEX IF NOT EXISTS idx_archives_user_date ON processing_archives(user_id, archive_date DESC);",
-            "CREATE INDEX IF NOT EXISTS idx_history_user_customer ON matching_history(user_id, customer_name);",
-            "CREATE INDEX IF NOT EXISTS idx_history_passport ON matching_history(passport_number);",
-            "CREATE INDEX IF NOT EXISTS idx_history_archive ON matching_history(archive_id);",
-            "CREATE INDEX IF NOT EXISTS idx_history_created_at ON matching_history(created_at DESC);"
+        # 컬럼 존재 여부 확인 쿼리들
+        check_columns = [
+            ("sales_date", "ALTER TABLE receipt_match_log ADD COLUMN sales_date DATE"),
+            ("category", "ALTER TABLE receipt_match_log ADD COLUMN category VARCHAR(100)"),
+            ("brand", "ALTER TABLE receipt_match_log ADD COLUMN brand VARCHAR(100)"),
+            ("product_code", "ALTER TABLE receipt_match_log ADD COLUMN product_code VARCHAR(50)"),
+            ("discount_amount_krw", "ALTER TABLE receipt_match_log ADD COLUMN discount_amount_krw FLOAT"),
+            ("sales_price_usd", "ALTER TABLE receipt_match_log ADD COLUMN sales_price_usd FLOAT"),
+            ("net_sales_krw", "ALTER TABLE receipt_match_log ADD COLUMN net_sales_krw FLOAT")
         ]
         
-        for idx_sql in indexes:
-            conn.execute(text(idx_sql))
-            
-        print("   ✅ 인덱스 생성 완료")
-        
-        # PostgreSQL 전문 검색 인덱스 (선택사항)
-        try:
-            print("✅ 3단계: 전문 검색 인덱스 생성 (PostgreSQL)")
-            gin_index = """
-            CREATE INDEX IF NOT EXISTS idx_history_receipt_search 
-            ON matching_history USING gin(to_tsvector('simple', receipt_numbers));
-            """
-            conn.execute(text(gin_index))
-            print("   ✅ 전문 검색 인덱스 생성 완료")
-        except Exception as e:
-            print(f"   ⚠️ 전문 검색 인덱스 생성 실패 (PostgreSQL 아닐 수 있음): {e}")
+        for col_name, add_sql in check_columns:
+            try:
+                # 컬럼 존재 확인
+                check_sql = """
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'receipt_match_log' AND column_name = :col_name
+                """
+                exists = conn.execute(text(check_sql), {"col_name": col_name}).fetchone()
+                
+                if not exists:
+                    conn.execute(text(add_sql))
+                    print(f"   ✅ {col_name} 컬럼 추가 완료")
+                else:
+                    print(f"   ✅ {col_name} 컬럼 이미 존재")
+                    
+            except Exception as e:
+                print(f"   ⚠️ {col_name} 컬럼 처리 중 오류: {e}")
         
         # 커밋
         conn.execute(text("COMMIT"))
@@ -86,9 +58,12 @@ with my_engine.connect() as conn:
         print(f"❌ 마이그레이션 실패, 롤백됨: {e}")
         raise e
 
-print("📦 아카이브 테이블 추가 마이그레이션 완료!")
-print("💡 이제 처리 완료 후 이력 저장 및 데이터 초기화 기능을 사용할 수 있습니다.")
-print("💡 새로운 기능:")
-print("   - 처리 완료 버튼으로 세션 종료 및 초기화")
-print("   - 이력 조회 페이지에서 과거 처리 결과 검색")
-print("   - 사용자별 완전한 데이터 격리")
+print("📦 간단한 컬럼 추가 마이그레이션 완료!")
+print("💡 추가된 컬럼들:")
+print("   - sales_date: 매출일자")
+print("   - category: 카테고리")
+print("   - brand: 브랜드")
+print("   - product_code: 상품코드")
+print("   - discount_amount_krw: 할인액(원)")
+print("   - sales_price_usd: 판매가(달러)")
+print("   - net_sales_krw: 순매출액(원)")
