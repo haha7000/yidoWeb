@@ -75,7 +75,8 @@ def shilla_matching_result(user_id):
             se."상품코드" as product_code,
             se."할인액(￦)" as discount_amount_krw,
             se."판매가($)" as sales_price_usd,
-            se."순매출액(￦)" as net_sales_krw
+            se."순매출액(￦)" as net_sales_krw,
+            se."점" as store_branch
         FROM shilla_receipts sr
         LEFT JOIN shilla_excel_data se
           ON se."receiptNumber"::text = sr.receipt_number
@@ -94,7 +95,7 @@ def shilla_matching_result(user_id):
             (receipt_number, is_matched, excel_name, receipt_passport_number, 
              excel_passport_number, passport_name, passport_birthday, 
              passport_is_matched, sales_date, category, brand,
-             product_code, discount_amount_krw, sales_price_usd, net_sales_krw) = row
+             product_code, discount_amount_krw, sales_price_usd, net_sales_krw, store_branch) = row
             
             # 최종 여권번호 결정
             final_passport_number = receipt_passport_number or excel_passport_number
@@ -108,6 +109,7 @@ def shilla_matching_result(user_id):
                 print(f"  - 할인액(원): {discount_amount_krw}")
                 print(f"  - 판매가($): {sales_price_usd}")
                 print(f"  - 순매출액(원): {net_sales_krw}")
+                print(f"  - 점: {store_branch}")
             
             # 날짜 변환 처리
             parsed_sales_date = None
@@ -155,6 +157,7 @@ def shilla_matching_result(user_id):
                 existing_log.discount_amount_krw = safe_float(discount_amount_krw) if is_matched else None
                 existing_log.sales_price_usd = safe_float(sales_price_usd) if is_matched else None
                 existing_log.net_sales_krw = safe_float(net_sales_krw) if is_matched else None
+                existing_log.store_branch = store_branch if is_matched else None
                 print(f"매칭 로그 업데이트: {receipt_number} (매칭={is_matched})")
             else:
                 # 새 로그 생성
@@ -172,7 +175,8 @@ def shilla_matching_result(user_id):
                     product_code=product_code if is_matched else None,
                     discount_amount_krw=safe_float(discount_amount_krw) if is_matched else None,
                     sales_price_usd=safe_float(sales_price_usd) if is_matched else None,
-                    net_sales_krw=safe_float(net_sales_krw) if is_matched else None
+                    net_sales_krw=safe_float(net_sales_krw) if is_matched else None,
+                    store_branch=store_branch if is_matched else None
                 )
                 session.add(match_log)
                 print(f"새 매칭 로그 생성: {receipt_number} (매칭={is_matched})")

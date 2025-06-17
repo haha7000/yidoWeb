@@ -30,7 +30,7 @@ def fetch_results(user_id, duty_free_type="lotte"):
                 rml.discount_amount_krw,
                 rml.sales_price_usd,
                 rml.net_sales_krw,
-                rml.additional_data
+                rml.store_branch
             FROM receipts r
             JOIN receipt_match_log rml ON r.receipt_number = rml.receipt_number
             WHERE rml.is_matched = TRUE 
@@ -88,7 +88,7 @@ def matching_passport(user_id, duty_free_type="lotte"):
             
         else:
             # 롯데 면세점 로직 - 상세 정보 포함
-            # 매칭된 데이터에서 상세 정보 조회 (additional_data 제거)
+            # 매칭된 데이터에서 상세 정보 조회 (store_branch 포함)
             matched_sql = """
             SELECT DISTINCT 
                 rml.excel_name,
@@ -101,7 +101,8 @@ def matching_passport(user_id, duty_free_type="lotte"):
                 rml.product_code,
                 rml.discount_amount_krw,
                 rml.sales_price_usd,
-                rml.net_sales_krw
+                rml.net_sales_krw,
+                rml.store_branch
             FROM receipt_match_log rml
             JOIN receipts r ON r.receipt_number = rml.receipt_number AND r.user_id = rml.user_id
             WHERE rml.is_matched = TRUE 
@@ -121,7 +122,7 @@ def matching_passport(user_id, duty_free_type="lotte"):
             for row in matched_results:
                 (excel_name, receipt_number, passport_number, birthday,
                  sales_date, category, brand, product_code, 
-                 discount_amount_krw, sales_price_usd, net_sales_krw) = row
+                 discount_amount_krw, sales_price_usd, net_sales_krw, store_branch) = row
                 
                 if excel_name not in customer_receipts:
                     customer_receipts[excel_name] = []
@@ -134,7 +135,8 @@ def matching_passport(user_id, duty_free_type="lotte"):
                         "product_code": product_code,
                         "discount_amount_krw": float(discount_amount_krw) if discount_amount_krw else None,
                         "sales_price_usd": float(sales_price_usd) if sales_price_usd else None,
-                        "net_sales_krw": float(net_sales_krw) if net_sales_krw else None
+                        "net_sales_krw": float(net_sales_krw) if net_sales_krw else None,
+                        "store_branch": store_branch
                     }
                     
                 customer_receipts[excel_name].append(receipt_number)
@@ -164,7 +166,7 @@ def matching_passport(user_id, duty_free_type="lotte"):
                         "discount_amount_krw": details["discount_amount_krw"],
                         "sales_price_usd": details["sales_price_usd"],
                         "net_sales_krw": details["net_sales_krw"],
-                        "additional_data": details["additional_data"]
+                        "store_branch": details["store_branch"]
                     }
                 }
                 passport_info.append(info)

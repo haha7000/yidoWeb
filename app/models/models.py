@@ -104,6 +104,7 @@ class ReceiptMatchLog(Base):
     discount_amount_krw = Column(Float, nullable=True)  # 할인액(원)
     sales_price_usd = Column(Float, nullable=True)  # 판매가(달러)
     net_sales_krw = Column(Float, nullable=True)  # 순매출액(원)
+    store_branch = Column(String(100), nullable=True)  # 점포구분 (롯데: 점구분, 신라: 점)
 
 class UnrecognizedImage(Base):
     __tablename__ = "unrecognized_images"

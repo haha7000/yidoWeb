@@ -592,14 +592,43 @@ function showQueryResultUI(data = sampleQueryData) {
         </div>
         <ul class="nav nav-tabs mb-3" id="feeTab" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="brand-tab" data-bs-toggle="tab" data-bs-target="#brand" type="button" role="tab">브랜드별 수수료 리스트</button>
+                <button class="nav-link active" id="category-tab" data-bs-toggle="tab" data-bs-target="#category" type="button" role="tab">카테고리별 수수료 리스트</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="brand-tab" data-bs-toggle="tab" data-bs-target="#brand" type="button" role="tab">브랜드별 수수료 리스트</button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="item-tab" data-bs-toggle="tab" data-bs-target="#item" type="button" role="tab">품목별 수수료 리스트</button>
             </li>
         </ul>
         <div class="tab-content" id="feeTabContent">
-            <div class="tab-pane fade show active" id="brand" role="tabpanel">
+            <div class="tab-pane fade show active" id="category" role="tabpanel">
+                <table class="fee-table mb-3">
+                    <thead>
+                        <tr>
+                            <th>카테고리 코드</th>
+                            <th>카테고리명</th>
+                            <th>수입/로컬</th>
+                            <th>수수료율</th>
+                            <th>작업</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${(data.categoryFees || []).map(fee => `
+                            <tr>
+                                <td>${fee.categoryCode}</td>
+                                <td>${fee.categoryName || '-'}</td>
+                                <td>${fee.importType}</td>
+                                <td>${fee.feeRate}</td>
+                                <td>
+                                    <button class="btn btn-outline-primary btn-sm" onclick="alert('수정 기능은 UI만 구현됨')">수정</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            <div class="tab-pane fade" id="brand" role="tabpanel">
                 <table class="fee-table mb-3">
                     <thead>
                         <tr>
@@ -724,20 +753,27 @@ async function searchFeeData() {
                 endDate: apiData.settings.effective_to || '',
                 description: apiData.settings.note || `${apiData.settings.company_name} ${apiData.settings.branch_name}점 수수료 기준`,
                 discountRate: (apiData.settings.free_rate_threshold * 100).toFixed(1),
-                brandFees: apiData.brand_fees.map(fee => ({
+                categoryFees: apiData.category_fees ? apiData.category_fees.map(fee => ({
+                    id: fee.id,
+                    categoryCode: fee.category_code,
+                    categoryName: fee.category_name || '',
+                    importType: fee.import_type || '-',
+                    feeRate: (fee.commission_rate * 100).toFixed(2) + '%'
+                })) : [],
+                brandFees: apiData.brand_fees ? apiData.brand_fees.map(fee => ({
                     id: fee.id,
                     category: fee.category_code,
                     brand: fee.brand_name,
                     feeRate: (fee.commission_rate * 100).toFixed(2) + '%'
-                })),
-                itemFees: apiData.item_fees.map(fee => ({
+                })) : [],
+                itemFees: apiData.item_fees ? apiData.item_fees.map(fee => ({
                     id: fee.id,
                     category: fee.category_code,
                     brand: fee.brand_name,
                     itemName: fee.item_name || '-',
                     itemCode: fee.product_code,
                     feeRate: (fee.commission_rate * 100).toFixed(2) + '%'
-                }))
+                })) : []
             };
             
             showQueryResultUI(transformedData);

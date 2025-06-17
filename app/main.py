@@ -761,15 +761,23 @@ async def update_unmatched(
             old_receipt_number = receipt.receipt_number
             receipt.receipt_number = new_receipt_number
             
-            # 롯데 엑셀 데이터에서 검색 (이름과 여권정보 조회)
+            # 롯데 엑셀 데이터에서 검색 (상세 정보 포함)
             sql = text("""
-                SELECT "receiptNumber", name, "PayBack"
+                SELECT "receiptNumber", name, "PayBack",
+                       "매출일자" as sales_date,
+                       "카테고리" as category,
+                       "브랜드" as brand,
+                       "상품코드" as product_code,
+                       "할인액(\)" as discount_amount_krw,
+                       "판매가($)" as sales_price_usd,
+                       "순매출액(\)" as net_sales_krw,
+                       "점구분" as store_branch
                 FROM lotte_excel_data
                 WHERE "receiptNumber" = :receipt_number
             """)
             result = db.execute(sql, {"receipt_number": new_receipt_number}).first()
             
-            # 매칭 로그 업데이트 (엑셀 이름 포함)
+            # 매칭 로그 업데이트 (상세 정보 포함)
             match_log = db.query(ReceiptMatchLog).filter(
                 ReceiptMatchLog.receipt_number == old_receipt_number,
                 ReceiptMatchLog.user_id == current_user.id
@@ -778,10 +786,10 @@ async def update_unmatched(
             if match_log:
                 match_log.receipt_number = new_receipt_number
                 match_log.is_matched = result is not None
-                match_log.excel_name = result[1] if result else None  # 엑셀 이름 추가
+                match_log.excel_name = result[1] if result else None
                 
                 # 여권 정보도 추가 (엑셀 이름으로 여권 검색)
-                if result and result[1]:  # 엑셀에서 이름이 있으면
+                if result and result[1]:
                     passport_info = db.query(Passport).filter(
                         Passport.name == result[1],
                         Passport.user_id == current_user.id
@@ -789,14 +797,75 @@ async def update_unmatched(
                     if passport_info:
                         match_log.passport_number = passport_info.passport_number
                         match_log.birthday = passport_info.birthday
+                
+                # 엑셀 상세 정보 업데이트
+                if result:
+                    # 날짜 변환 처리
+                    parsed_sales_date = None
+                    if result[3]:  # sales_date
+                        try:
+                            if isinstance(result[3], str):
+                                parsed_sales_date = datetime.strptime(result[3], '%Y-%m-%d').date()
+                            elif hasattr(result[3], 'date'):
+                                parsed_sales_date = result[3].date()
+                            else:
+                                parsed_sales_date = result[3]
+                        except (ValueError, AttributeError) as e:
+                            print(f"날짜 파싱 오류: {result[3]} - {e}")
+                            parsed_sales_date = None
+                    
+                    # 숫자 변환 처리 함수
+                    def safe_float(value):
+                        if value is None:
+                            return None
+                        try:
+                            if isinstance(value, str):
+                                value = value.replace(',', '').replace('￦', '').replace('$', '').replace('\\', '').strip()
+                            return float(value) if value != '' else None
+                        except (ValueError, TypeError, AttributeError):
+                            return None
+                    
+                    match_log.sales_date = parsed_sales_date
+                    match_log.category = result[4]  # category
+                    match_log.brand = result[5]  # brand
+                    match_log.product_code = result[6]  # product_code
+                    match_log.discount_amount_krw = safe_float(result[7])  # discount_amount_krw
+                    match_log.sales_price_usd = safe_float(result[8])  # sales_price_usd
+                    match_log.net_sales_krw = safe_float(result[9])  # net_sales_krw
+                    match_log.store_branch = result[10]  # store_branch
             else:
-                # 새 로그 생성 시에도 엑셀 정보 포함
+                # 새 로그 생성 시에도 상세 정보 포함
                 passport_info = None
                 if result and result[1]:
                     passport_info = db.query(Passport).filter(
                         Passport.name == result[1],
                         Passport.user_id == current_user.id
                     ).first()
+                
+                # 날짜 변환 처리
+                parsed_sales_date = None
+                if result and result[3]:  # sales_date
+                    try:
+                        if isinstance(result[3], str):
+                            parsed_sales_date = datetime.strptime(result[3], '%Y-%m-%d').date()
+                        elif hasattr(result[3], 'date'):
+                            parsed_sales_date = result[3].date()
+                        else:
+                            parsed_sales_date = result[3]
+                    except (ValueError, AttributeError) as e:
+                        print(f"날짜 파싱 오류: {result[3]} - {e}")
+                        parsed_sales_date = None
+                
+                # 숫자 변환 처리 함수
+                def safe_float(value):
+                    if value is None:
+                        return None
+                    try:
+                        if isinstance(value, str):
+                            value = value.replace(',', '').replace('￦', '').replace('$', '').replace('\\', '').strip()
+                        return float(value) if value != '' else None
+                    except (ValueError, TypeError, AttributeError):
+                        return None
                     
                 new_match_log = ReceiptMatchLog(
                     user_id=current_user.id,
@@ -804,7 +873,16 @@ async def update_unmatched(
                     is_matched=result is not None,
                     excel_name=result[1] if result else None,
                     passport_number=passport_info.passport_number if passport_info else None,
-                    birthday=passport_info.birthday if passport_info else None
+                    birthday=passport_info.birthday if passport_info else None,
+                    # 엑셀 상세 정보
+                    sales_date=parsed_sales_date if result else None,
+                    category=result[4] if result else None,
+                    brand=result[5] if result else None,
+                    product_code=result[6] if result else None,
+                    discount_amount_krw=safe_float(result[7]) if result else None,
+                    sales_price_usd=safe_float(result[8]) if result else None,
+                    net_sales_krw=safe_float(result[9]) if result else None,
+                    store_branch=result[10] if result else None
                 )
                 db.add(new_match_log)
                     
@@ -828,9 +906,17 @@ async def update_unmatched(
         if passport_number.strip():  # 여권번호가 제공된 경우에만 업데이트
             shilla_receipt.passport_number = passport_number.strip()
         
-        # 신라 엑셀 데이터에서 영수증 번호 매칭 확인
+        # 신라 엑셀 데이터에서 영수증 번호 매칭 확인 (상세 정보 포함)
         excel_sql = text("""
-            SELECT "receiptNumber", name, "PayBack"
+            SELECT "receiptNumber", name, "PayBack",
+                   "매출일자" as sales_date,
+                   "카테고리" as category,
+                   "브랜드명" as brand,
+                   "상품코드" as product_code,
+                   "할인액(￦)" as discount_amount_krw,
+                   "판매가($)" as sales_price_usd,
+                   "순매출액(￦)" as net_sales_krw,
+                   "점" as store_branch
             FROM shilla_excel_data
             WHERE "receiptNumber"::text = :receipt_number
         """)
@@ -864,21 +950,91 @@ async def update_unmatched(
         ).first()
         
         if match_log:
-            # 기존 로그 업데이트
+            # 기존 로그 업데이트 (상세 정보 포함)
             match_log.receipt_number = new_receipt_number
             match_log.is_matched = excel_result is not None
             match_log.excel_name = excel_result[1] if excel_result else None
             match_log.passport_number = passport_number.strip() if passport_number.strip() else None
             match_log.birthday = passport_info.birthday if passport_info else None
+            
+            # 엑셀 상세 정보 업데이트
+            if excel_result:
+                # 날짜 변환 처리
+                parsed_sales_date = None
+                if excel_result[3]:  # sales_date
+                    try:
+                        if isinstance(excel_result[3], str):
+                            parsed_sales_date = datetime.strptime(excel_result[3], '%Y-%m-%d').date()
+                        elif hasattr(excel_result[3], 'date'):
+                            parsed_sales_date = excel_result[3].date()
+                        else:
+                            parsed_sales_date = excel_result[3]
+                    except (ValueError, AttributeError) as e:
+                        print(f"날짜 파싱 오류: {excel_result[3]} - {e}")
+                        parsed_sales_date = None
+                
+                # 숫자 변환 처리 함수
+                def safe_float(value):
+                    if value is None:
+                        return None
+                    try:
+                        if isinstance(value, str):
+                            value = value.replace(',', '').replace('￦', '').replace('$', '').strip()
+                        return float(value) if value != '' else None
+                    except (ValueError, TypeError, AttributeError):
+                        return None
+                
+                match_log.sales_date = parsed_sales_date
+                match_log.category = excel_result[4]  # category
+                match_log.brand = excel_result[5]  # brand
+                match_log.product_code = excel_result[6]  # product_code
+                match_log.discount_amount_krw = safe_float(excel_result[7])  # discount_amount_krw
+                match_log.sales_price_usd = safe_float(excel_result[8])  # sales_price_usd
+                match_log.net_sales_krw = safe_float(excel_result[9])  # net_sales_krw
+                match_log.store_branch = excel_result[10]  # store_branch
         else:
-            # 새 로그 생성
+            # 새 로그 생성 (상세 정보 포함)
+            # 날짜 변환 처리
+            parsed_sales_date = None
+            if excel_result and excel_result[3]:  # sales_date
+                try:
+                    if isinstance(excel_result[3], str):
+                        parsed_sales_date = datetime.strptime(excel_result[3], '%Y-%m-%d').date()
+                    elif hasattr(excel_result[3], 'date'):
+                        parsed_sales_date = excel_result[3].date()
+                    else:
+                        parsed_sales_date = excel_result[3]
+                except (ValueError, AttributeError) as e:
+                    print(f"날짜 파싱 오류: {excel_result[3]} - {e}")
+                    parsed_sales_date = None
+            
+            # 숫자 변환 처리 함수
+            def safe_float(value):
+                if value is None:
+                    return None
+                try:
+                    if isinstance(value, str):
+                        value = value.replace(',', '').replace('￦', '').replace('$', '').strip()
+                    return float(value) if value != '' else None
+                except (ValueError, TypeError, AttributeError):
+                    return None
+            
             new_match_log = ReceiptMatchLog(
                 user_id=current_user.id,
                 receipt_number=new_receipt_number,
                 is_matched=excel_result is not None,
                 excel_name=excel_result[1] if excel_result else None,
                 passport_number=passport_number.strip() if passport_number.strip() else None,
-                birthday=passport_info.birthday if passport_info else None
+                birthday=passport_info.birthday if passport_info else None,
+                # 엑셀 상세 정보
+                sales_date=parsed_sales_date if excel_result else None,
+                category=excel_result[4] if excel_result else None,
+                brand=excel_result[5] if excel_result else None,
+                product_code=excel_result[6] if excel_result else None,
+                discount_amount_krw=safe_float(excel_result[7]) if excel_result else None,
+                sales_price_usd=safe_float(excel_result[8]) if excel_result else None,
+                net_sales_krw=safe_float(excel_result[9]) if excel_result else None,
+                store_branch=excel_result[10] if excel_result else None
             )
             db.add(new_match_log)
         

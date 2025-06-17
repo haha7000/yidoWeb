@@ -21,7 +21,7 @@ with my_engine.connect() as conn:
         ADD COLUMN IF NOT EXISTS discount_amount_krw DECIMAL(12,2),
         ADD COLUMN IF NOT EXISTS sales_price_usd DECIMAL(12,2),
         ADD COLUMN IF NOT EXISTS net_sales_krw DECIMAL(12,2),
-        ADD COLUMN IF NOT EXISTS additional_data JSONB;
+        ADD COLUMN IF NOT EXISTS store_branch VARCHAR(100);
         """
         
         conn.execute(text(add_columns_sql))
@@ -59,4 +59,4 @@ print("   - product_code: 상품코드")
 print("   - discount_amount_krw: 할인액(원)")
 print("   - sales_price_usd: 판매가(달러)")
 print("   - net_sales_krw: 순매출액(원)")
-print("   - additional_data: 추가 데이터 (JSON 형태)")
+print("   - store_branch: 점포구분 (롯데: 점구분, 신라: 점)")
