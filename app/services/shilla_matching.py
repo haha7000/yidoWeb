@@ -54,34 +54,39 @@ def shilla_matching_result(user_id):
         
         print(f"여권 매칭 상태 업데이트: 엑셀 {passport_updated1}개, 영수증 {passport_updated2}개")
         
-        # 3단계: 포괄적인 영수증 매칭 결과 조회
+        # 3단계: 포괄적인 영수증 매칭 결과 조회 (중복 방지 - 각 영수증 번호당 하나의 레코드만)
         sql_matching = """
         SELECT DISTINCT 
             sr.receipt_number,
             CASE
-                WHEN se."receiptNumber" IS NOT NULL THEN TRUE
+                WHEN se_first."receiptNumber" IS NOT NULL THEN TRUE
                 ELSE FALSE 
             END AS is_matched,
-            se.name as excel_name,
+            se_first.name as excel_name,
             sr.passport_number as receipt_passport_number,
-            se.passport_number as excel_passport_number,
+            se_first.passport_number as excel_passport_number,
             p.name as passport_name,
             p.birthday as passport_birthday,
             p.is_matched as passport_is_matched,
             -- 신라 추가 정보
-            se."매출일자" as sales_date,
-            se."카테고리" as category,
-            se."브랜드명" as brand,
-            se."상품코드" as product_code,
-            se."할인액(￦)" as discount_amount_krw,
-            se."판매가($)" as sales_price_usd,
-            se."순매출액(￦)" as net_sales_krw,
-            se."점" as store_branch
+            se_first."매출일자" as sales_date,
+            se_first."카테고리" as category,
+            se_first."브랜드명" as brand,
+            se_first."상품코드" as product_code,
+            se_first."할인액(￦)" as discount_amount_krw,
+            se_first."판매가($)" as sales_price_usd,
+            se_first."순매출액(￦)" as net_sales_krw,
+            se_first."점" as store_branch
         FROM shilla_receipts sr
-        LEFT JOIN shilla_excel_data se
-          ON se."receiptNumber"::text = sr.receipt_number
+        LEFT JOIN (
+            SELECT DISTINCT ON ("receiptNumber") 
+                "receiptNumber", name, passport_number, "매출일자", "카테고리", "브랜드명", 
+                "상품코드", "할인액(￦)", "판매가($)", "순매출액(￦)", "점"
+            FROM shilla_excel_data
+            ORDER BY "receiptNumber", name
+        ) se_first ON se_first."receiptNumber"::text = sr.receipt_number
         LEFT JOIN passports p
-          ON (sr.passport_number = p.passport_number OR se.passport_number = p.passport_number) 
+          ON (sr.passport_number = p.passport_number OR se_first.passport_number = p.passport_number) 
           AND p.user_id = :user_id
         WHERE sr.user_id = :user_id
         ORDER BY sr.receipt_number
@@ -142,10 +147,11 @@ def shilla_matching_result(user_id):
                 except (ValueError, TypeError, AttributeError):
                     return None
             
-            # 기존 매칭 로그 조회
+            # 기존 매칭 로그 조회 (더 정확한 조건으로 중복 방지)
             existing_log = session.query(ReceiptMatchLog).filter(
                 ReceiptMatchLog.receipt_number == receipt_number,
-                ReceiptMatchLog.user_id == user_id
+                ReceiptMatchLog.user_id == user_id,
+                ReceiptMatchLog.duty_free_type == "shilla"
             ).first()
             
             if existing_log:
