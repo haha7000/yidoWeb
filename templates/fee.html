@@ -111,8 +111,9 @@
                         <option value="main">본점</option>
                         <option value="airport">공항점</option>
                         <option value="gangnam">강남점</option>
-                        <option value="myeongdong">명동점</option>
+                        <option value="myeongdong">명동본점</option>
                         <option value="busan">부산</option>
+                        <option value="seoul">서울점</option>
                     </select>
                 </div>
                 <div class="col-md-3 d-flex align-items-end">
@@ -719,8 +720,9 @@ async function searchFeeData() {
                 'main': '본점',
                 'airport': '공항점', 
                 'gangnam': '강남점',
-                'myeongdong': '명동점',
-                'busan': '부산'
+                'myeongdong': '명동본점',
+                'busan': '부산',
+                'seoul': '서울점'
             };
             params.append('branch_name', branchMap[branch] || branch);
         }

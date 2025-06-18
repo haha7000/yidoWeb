@@ -100,7 +100,12 @@ def shilla_matching_result(user_id):
             # 최종 여권번호 결정
             final_passport_number = receipt_passport_number or excel_passport_number
             
-            print(f"신라 영수증: {receipt_number}, 매칭: {is_matched}, 이름: {excel_name}")
+            # 신라 면세점의 경우: 여권과 매칭이 완료되면 여권의 실제 이름을 사용
+            final_excel_name = excel_name
+            if final_passport_number and passport_name:
+                final_excel_name = passport_name
+            
+            print(f"신라 영수증: {receipt_number}, 매칭: {is_matched}, 이름: {final_excel_name}")
             if is_matched:
                 print(f"  - 매출일자: {sales_date}")
                 print(f"  - 카테고리: {category}")
@@ -146,7 +151,7 @@ def shilla_matching_result(user_id):
             if existing_log:
                 # 기존 로그 업데이트
                 existing_log.is_matched = is_matched
-                existing_log.excel_name = excel_name if is_matched else None
+                existing_log.excel_name = final_excel_name if is_matched else None
                 existing_log.passport_number = final_passport_number
                 existing_log.birthday = passport_birthday
                 # 상세 정보 업데이트
@@ -165,7 +170,7 @@ def shilla_matching_result(user_id):
                     user_id=user_id,
                     receipt_number=receipt_number,
                     is_matched=is_matched,
-                    excel_name=excel_name if is_matched else None,
+                    excel_name=final_excel_name if is_matched else None,
                     passport_number=final_passport_number,
                     birthday=passport_birthday,
                     # 상세 정보
@@ -345,6 +350,11 @@ def fetch_shilla_results_with_receipt_ids(user_id):
             
             # 최종 여권번호 결정
             final_passport_number = receipt_passport_number or excel_passport_number
+            
+            # 신라 면세점의 경우: 여권과 매칭이 완료되면 여권의 실제 이름을 사용
+            final_excel_name = excel_name
+            if final_passport_number and passport_name:
+                final_excel_name = passport_name
             
             # 표시할 이름 결정: 여권 풀네임 우선, 없으면 엑셀 성씨
             display_name = passport_name if passport_name else excel_name
@@ -578,6 +588,11 @@ def fetch_shilla_results_with_details(user_id):
             
             # 최종 여권번호 결정
             final_passport_number = receipt_passport_number or excel_passport_number
+            
+            # 신라 면세점의 경우: 여권과 매칭이 완료되면 여권의 실제 이름을 사용
+            final_excel_name = excel_name
+            if final_passport_number and passport_name:
+                final_excel_name = passport_name
             
             # 표시할 이름 결정: 여권 풀네임 우선, 없으면 엑셀 성씨
             display_name = passport_name if passport_name else excel_name
