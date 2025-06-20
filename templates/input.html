@@ -43,10 +43,10 @@
                 </a>
             </div>
             <div class="col-md-3 col-sm-6">
-                <button type="button" class="btn btn-warning w-100" onclick="checkProcessingStatus()">
-                    <i class="fas fa-chart-line me-2"></i>
-                    <div>처리 현황</div>
-                    <small class="d-block mt-1 opacity-75">진행 상태</small>
+                <button type="button" class="btn btn-warning w-100" onclick="goToHistory()">
+                    <i class="fas fa-history me-2"></i>
+                    <div>조회</div>
+                    <small class="d-block mt-1 opacity-75">처리 이력</small>
                 </button>
             </div>
             <div class="col-md-3 col-sm-6">
@@ -661,6 +661,11 @@ document.addEventListener('DOMContentLoaded', function() {
         window.location.href = '/fee/';
     }
 
+    // 처리 이력 페이지로 이동
+    function goToHistory() {
+        window.location.href = '/history/';
+    }
+
     // 폼 제출
     uploadForm.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -798,6 +803,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 전역 함수로 노출
     window.checkProcessingStatus = checkProcessingStatus;
     window.goToFeeManagement = goToFeeManagement;
+    window.goToHistory = goToHistory;
 });
 </script>
 {% endblock %}

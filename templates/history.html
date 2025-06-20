@@ -33,7 +33,7 @@
                 <div class="col-md-8">
                     <div class="input-group">
                         <input type="text" id="searchQuery" class="form-control" 
-                               placeholder="고객명, 여권번호, 영수증번호로 검색...">
+                               placeholder="고객명, 여권번호, 영수증번호, 브랜드, 세션명으로 검색...">
                         <button class="btn btn-primary" type="button" id="searchBtn">
                             <i class="fas fa-search"></i> 검색
                         </button>
@@ -61,7 +61,27 @@
                 </h5>
             </div>
             <div class="card-body">
-                <div id="searchResultsList"></div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>세션명</th>
+                                <th>영수증번호</th>
+                                <th>고객명</th>
+                                <th>여권번호</th>
+                                <th>브랜드</th>
+                                <th>카테고리</th>
+                                <th>면세점</th>
+                                <th>매칭상태</th>
+                                <th>수수료</th>
+                                <th>처리일시</th>
+                            </tr>
+                        </thead>
+                        <tbody id="searchResultsList">
+                            <!-- 동적으로 채워짐 -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -71,79 +91,77 @@
         <div class="card-header">
             <h5 class="mb-0">
                 <i class="fas fa-list"></i> 처리 세션 이력
-                {% if archives %}
-                <span class="badge bg-primary ms-2">{{ archives|length }}개</span>
+                {% if sessions %}
+                <span class="badge bg-primary ms-2">{{ sessions|length }}개 세션</span>
                 {% endif %}
             </h5>
         </div>
         <div class="card-body">
-            {% if archives %}
+            {% if sessions %}
             <div class="table-responsive">
                 <table class="table table-hover">
                     <thead class="table-dark">
                         <tr>
                             <th>세션명</th>
-                            <th>처리일</th>
+                            <th>처리일시</th>
                             <th>면세점</th>
-                            <th>전체 영수증</th>
-                            <th>매칭된 영수증</th>
-                            <th>전체 여권</th>
-                            <th>매칭된 여권</th>
+                            <th>총 레코드</th>
+                            <th>매칭 레코드</th>
                             <th>완료율</th>
+                            <th>총 수수료</th>
                             <th>작업</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for archive in archives %}
+                        {% for session in sessions %}
                         <tr>
                             <td>
-                                <strong>{{ archive.session_name }}</strong>
-                                {% if archive.notes %}
-                                <br><small class="text-muted">{{ archive.notes }}</small>
-                                {% endif %}
+                                <strong>{{ session.session_name }}</strong>
+                                <br><small class="text-muted">{{ session.upload_id }}</small>
                             </td>
                             <td>
-                                {{ archive.archive_date.strftime('%Y-%m-%d %H:%M') }}
+                                {{ session.session_date.strftime('%Y-%m-%d %H:%M') }}
                             </td>
                             <td>
-                                {% if archive.duty_free_type == "lotte" %}
+                                {% if session.duty_free_type == "lotte" %}
                                 <span class="badge bg-warning">롯데</span>
-                                {% elif archive.duty_free_type == "shilla" %}
+                                {% elif session.duty_free_type == "shilla" %}
                                 <span class="badge bg-info">신라</span>
                                 {% else %}
                                 <span class="badge bg-secondary">알 수 없음</span>
                                 {% endif %}
                             </td>
                             <td>
-                                <span class="badge bg-primary">{{ archive.total_receipts }}</span>
+                                <span class="badge bg-primary">{{ session.total_records }}</span>
                             </td>
                             <td>
-                                <span class="badge bg-success">{{ archive.matched_receipts }}</span>
+                                <span class="badge bg-success">{{ session.matched_records }}</span>
                             </td>
                             <td>
-                                <span class="badge bg-primary">{{ archive.total_passports }}</span>
-                            </td>
-                            <td>
-                                <span class="badge bg-success">{{ archive.matched_passports }}</span>
-                            </td>
-                            <td>
-                                {% set completion_rate = archive.completion_rate %}
-                                {% if completion_rate >= 90 %}
-                                <span class="badge bg-success">{{ completion_rate }}%</span>
-                                {% elif completion_rate >= 70 %}
-                                <span class="badge bg-warning">{{ completion_rate }}%</span>
+                                {% if session.completion_rate >= 90 %}
+                                <span class="badge bg-success">{{ session.completion_rate }}%</span>
+                                {% elif session.completion_rate >= 70 %}
+                                <span class="badge bg-warning">{{ session.completion_rate }}%</span>
                                 {% else %}
-                                <span class="badge bg-danger">{{ completion_rate }}%</span>
+                                <span class="badge bg-danger">{{ session.completion_rate }}%</span>
                                 {% endif %}
+                            </td>
+                            <td>
+                                <strong>{{ "{:,.0f}".format(session.total_commission) }}원</strong>
                             </td>
                             <td>
                                 <div class="btn-group" role="group">
                                     <button type="button" class="btn btn-sm btn-outline-primary" 
-                                            onclick="viewArchiveDetail({{ archive.id }})">
+                                            onclick="viewSessionDetail('{{ session.upload_id }}', '{{ session.session_name }}')">
                                         <i class="fas fa-eye"></i> 상세
                                     </button>
+                                    <a href="/download/receipt/session/{{ session.upload_id }}" 
+                                       class="btn btn-sm btn-outline-success"
+                                       title="세션의 모든 수령증 다운로드">
+                                        <i class="fas fa-download"></i> 수령증
+                                    </a>
                                     <button type="button" class="btn btn-sm btn-outline-danger" 
-                                            onclick="deleteArchive({{ archive.id }})">
+                                            onclick="deleteSession('{{ session.upload_id }}', '{{ session.session_name }}')">
                                         <i class="fas fa-trash"></i> 삭제
                                     </button>
                                 </div>
@@ -167,18 +185,18 @@
     </div>
 </div>
 
-<!-- 아카이브 상세 모달 -->
-<div class="modal fade" id="archiveDetailModal" tabindex="-1" aria-labelledby="archiveDetailModalLabel" aria-hidden="true">
+<!-- 세션 상세 모달 -->
+<div class="modal fade" id="sessionDetailModal" tabindex="-1" aria-labelledby="sessionDetailModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="archiveDetailModalLabel">
+                <h5 class="modal-title" id="sessionDetailModalLabel">
                     <i class="fas fa-list-alt"></i> 세션 상세 정보
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div id="archiveDetailContent">
+                <div id="sessionDetailContent">
                     <div class="text-center p-4">
                         <i class="fas fa-spinner fa-spin fa-2x"></i>
                         <p class="mt-2">상세 정보를 불러오는 중...</p>
@@ -192,63 +210,6 @@
     </div>
 </div>
 
-<style>
-.table th {
-    white-space: nowrap;
-    font-size: 0.9rem;
-}
-
-.table td {
-    vertical-align: middle;
-    font-size: 0.9rem;
-}
-
-.badge {
-    font-size: 0.8rem;
-}
-
-.btn-group .btn {
-    font-size: 0.8rem;
-    padding: 0.25rem 0.5rem;
-}
-
-.search-result-item {
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    background-color: #f8f9fa;
-    transition: all 0.2s ease;
-}
-
-.search-result-item:hover {
-    background-color: #e9ecef;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.search-highlight {
-    background-color: #fff3cd;
-    padding: 2px 4px;
-    border-radius: 3px;
-    font-weight: bold;
-}
-
-@media (max-width: 768px) {
-    .table-responsive {
-        font-size: 0.8rem;
-    }
-    
-    .btn-group {
-        flex-direction: column;
-    }
-    
-    .btn-group .btn {
-        margin-bottom: 2px;
-    }
-}
-</style>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const searchBtn = document.getElementById('searchBtn');
@@ -258,160 +219,95 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchResultsList = document.getElementById('searchResultsList');
     const searchResultCount = document.getElementById('searchResultCount');
 
-    // 검색 버튼 클릭
-    searchBtn.addEventListener('click', performSearch);
-    
-    // 엔터키로 검색
-    searchQuery.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            performSearch();
-        }
-    });
-
-    async function performSearch() {
+    // 검색 실행
+    function performSearch() {
         const query = searchQuery.value.trim();
+        const type = searchType.value;
+
         if (!query) {
             searchResults.style.display = 'none';
             return;
         }
 
-        try {
-            searchBtn.disabled = true;
-            searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 검색 중...';
+        searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 검색 중...';
+        searchBtn.disabled = true;
 
-            const response = await fetch(`/history/search/?q=${encodeURIComponent(query)}&search_type=${searchType.value}`);
-            const data = await response.json();
-
-            if (data.success) {
-                displaySearchResults(data.results, query);
-                searchResultCount.textContent = data.total;
-                searchResults.style.display = 'block';
-            } else {
-                showNotification('검색 중 오류가 발생했습니다: ' + data.error, 'error');
-                searchResults.style.display = 'none';
-            }
-        } catch (error) {
-            console.error('검색 오류:', error);
-            showNotification('네트워크 오류가 발생했습니다.', 'error');
-            searchResults.style.display = 'none';
-        } finally {
-            searchBtn.disabled = false;
-            searchBtn.innerHTML = '<i class="fas fa-search"></i> 검색';
-        }
+        fetch(`/history/search/?q=${encodeURIComponent(query)}&search_type=${type}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displaySearchResults(data.results);
+                    searchResultCount.textContent = data.total;
+                    searchResults.style.display = 'block';
+                } else {
+                    alert('검색 중 오류가 발생했습니다: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('검색 오류:', error);
+                alert('검색 중 오류가 발생했습니다.');
+            })
+            .finally(() => {
+                searchBtn.innerHTML = '<i class="fas fa-search"></i> 검색';
+                searchBtn.disabled = false;
+            });
     }
 
-    function displaySearchResults(results, query) {
-        if (results.length === 0) {
-            searchResultsList.innerHTML = `
-                <div class="text-center p-4">
-                    <i class="fas fa-search fa-2x text-muted mb-3"></i>
-                    <h5>검색 결과가 없습니다</h5>
-                    <p class="text-muted">"${query}"에 대한 결과를 찾을 수 없습니다.</p>
-                </div>
+    // 검색 결과 표시
+    function displaySearchResults(results) {
+        searchResultsList.innerHTML = '';
+        
+        results.forEach(result => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>${result.session_name}</strong></td>
+                <td>${result.receipt_number || '-'}</td>
+                <td>${result.excel_name || '-'}</td>
+                <td>${result.passport_number || '-'}</td>
+                <td>${result.brand || '-'}</td>
+                <td>${result.category || '-'}</td>
+                <td>
+                    ${result.duty_free_type === 'lotte' ? '<span class="badge bg-warning">롯데</span>' : 
+                      result.duty_free_type === 'shilla' ? '<span class="badge bg-info">신라</span>' : 
+                      '<span class="badge bg-secondary">-</span>'}
+                </td>
+                <td>
+                    ${result.is_matched ? '<span class="badge bg-success">매칭됨</span>' : '<span class="badge bg-danger">미매칭</span>'}
+                </td>
+                <td>${result.commission_fee ? Math.round(result.commission_fee).toLocaleString() + '원' : '-'}</td>
+                <td>${result.archived_at}</td>
             `;
-            return;
+            searchResultsList.appendChild(row);
+        });
+    }
+
+    // 이벤트 리스너
+    searchBtn.addEventListener('click', performSearch);
+    searchQuery.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            performSearch();
         }
-
-        const resultHtml = results.map(item => {
-            const receiptNumbers = Array.isArray(item.receipt_numbers) ? item.receipt_numbers : [];
-            const receiptNumbersText = receiptNumbers.join(', ');
-            
-            return `
-                <div class="search-result-item">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6 class="mb-2">
-                                <i class="fas fa-user text-primary"></i> 
-                                ${highlightQuery(item.customer_name || '알 수 없음', query)}
-                            </h6>
-                            <p class="mb-1">
-                                <i class="fas fa-id-card text-info"></i> 
-                                여권번호: ${highlightQuery(item.passport_number || '없음', query)}
-                            </p>
-                            <p class="mb-1">
-                                <i class="fas fa-receipt text-success"></i> 
-                                영수증: ${highlightQuery(receiptNumbersText || '없음', query)}
-                            </p>
-                        </div>
-                        <div class="col-md-6">
-                            <p class="mb-1">
-                                <i class="fas fa-calendar text-warning"></i> 
-                                처리일: ${new Date(item.created_at).toLocaleDateString('ko-KR')}
-                            </p>
-                            <p class="mb-1">
-                                <i class="fas fa-folder text-secondary"></i> 
-                                세션: ${item.session_name || '알 수 없음'}
-                            </p>
-                            <p class="mb-0">
-                                <span class="badge ${getStatusBadgeClass(item.match_status)}">
-                                    ${item.match_status || '알 수 없음'}
-                                </span>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        searchResultsList.innerHTML = resultHtml;
-    }
-
-    function highlightQuery(text, query) {
-        if (!text || !query) return text;
-        const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
-        return text.replace(regex, '<span class="search-highlight">$1</span>');
-    }
-
-    function escapeRegExp(string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    function getStatusBadgeClass(status) {
-        switch (status) {
-            case '매칭됨':
-            case 'completed':
-                return 'bg-success';
-            case '여권번호 수정 필요':
-            case 'needs_update':
-                return 'bg-warning';
-            case '여권 정보 없음':
-                return 'bg-danger';
-            default:
-                return 'bg-secondary';
-        }
-    }
-
-    // 알림 함수
-    function showNotification(message, type = 'info') {
-        const alertClass = type === 'success' ? 'alert-success' : 
-                          type === 'error' ? 'alert-danger' : 'alert-info';
-        
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
-        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-        alertDiv.innerHTML = `
-            <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle'}"></i>
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-        
-        document.body.appendChild(alertDiv);
-        
-        setTimeout(() => {
-            if (alertDiv.parentNode) {
-                alertDiv.remove();
-            }
-        }, 5000);
-    }
+    });
 });
 
-// 아카이브 상세 보기
-async function viewArchiveDetail(archiveId) {
-    const modal = new bootstrap.Modal(document.getElementById('archiveDetailModal'));
-    const content = document.getElementById('archiveDetailContent');
+// 현재 선택된 업로드 ID 저장
+let currentUploadId = null;
+
+// 현재 업로드 ID 반환
+function getCurrentUploadId() {
+    return currentUploadId;
+}
+
+// 세션 상세 보기
+function viewSessionDetail(uploadId, sessionName) {
+    currentUploadId = uploadId; // 현재 업로드 ID 저장
     
-    // 로딩 상태
-    content.innerHTML = `
+    const modal = new bootstrap.Modal(document.getElementById('sessionDetailModal'));
+    const modalTitle = document.getElementById('sessionDetailModalLabel');
+    const modalContent = document.getElementById('sessionDetailContent');
+    
+    modalTitle.innerHTML = `<i class="fas fa-list-alt"></i> ${sessionName} 상세 정보`;
+    modalContent.innerHTML = `
         <div class="text-center p-4">
             <i class="fas fa-spinner fa-spin fa-2x"></i>
             <p class="mt-2">상세 정보를 불러오는 중...</p>
@@ -420,59 +316,153 @@ async function viewArchiveDetail(archiveId) {
     
     modal.show();
     
-    try {
-        const response = await fetch(`/history/detail/${archiveId}`);
-        const data = await response.json();
-        
-        if (data.success) {
-            // 상세 정보 표시 (구현 필요)
-            content.innerHTML = `
-                <div class="alert alert-info">
-                    상세 정보 표시 기능은 추후 구현 예정입니다.
-                    <br>아카이브 ID: ${archiveId}
-                </div>
-            `;
-        } else {
-            content.innerHTML = `
+    // 상세 데이터 로드
+    fetch(`/history/session-detail/${uploadId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displaySessionDetail(data.data);
+            } else {
+                modalContent.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        상세 정보를 불러오는데 실패했습니다: ${data.error}
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('상세 정보 로드 오류:', error);
+            modalContent.innerHTML = `
                 <div class="alert alert-danger">
-                    상세 정보를 불러올 수 없습니다: ${data.error}
+                    <i class="fas fa-exclamation-triangle"></i>
+                    상세 정보를 불러오는데 실패했습니다.
                 </div>
             `;
-        }
-    } catch (error) {
-        content.innerHTML = `
-            <div class="alert alert-danger">
-                네트워크 오류가 발생했습니다.
-            </div>
-        `;
-    }
+        });
 }
 
-// 아카이브 삭제
-async function deleteArchive(archiveId) {
-    if (!confirm('이 처리 이력을 삭제하시겠습니까? 삭제된 데이터는 복구할 수 없습니다.')) {
-        return;
-    }
+// 세션 상세 정보 표시
+function displaySessionDetail(data) {
+    const modalContent = document.getElementById('sessionDetailContent');
     
-    try {
-        const response = await fetch(`/history/delete/${archiveId}`, {
-            method: 'DELETE'
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            showNotification('이력이 삭제되었습니다.', 'success');
-            // 페이지 새로고침
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-        } else {
-            showNotification('삭제 중 오류가 발생했습니다: ' + data.error, 'error');
+    // 고객별로 그룹화
+    const customerGroups = {};
+    data.forEach(record => {
+        const customerName = record.excel_name || '알 수 없음';
+        if (!customerGroups[customerName]) {
+            customerGroups[customerName] = [];
         }
-    } catch (error) {
-        showNotification('네트워크 오류가 발생했습니다.', 'error');
+        customerGroups[customerName].push(record);
+    });
+    
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>영수증번호</th>
+                        <th>고객명</th>
+                        <th>여권번호</th>
+                        <th>브랜드</th>
+                        <th>카테고리</th>
+                        <th>매칭상태</th>
+                        <th>수수료</th>
+                        <th>순매출액</th>
+                        <th>수령증</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    // 고객별로 첫 번째 행에만 수령증 다운로드 버튼 표시
+    Object.keys(customerGroups).forEach(customerName => {
+        const records = customerGroups[customerName];
+        records.forEach((record, index) => {
+            html += `
+                <tr>
+                    <td>${record.receipt_number || '-'}</td>
+                    <td>${record.excel_name || '-'}</td>
+                    <td>${record.passport_number || '-'}</td>
+                    <td>${record.brand || '-'}</td>
+                    <td>${record.category || '-'}</td>
+                    <td>
+                        ${record.is_matched ? '<span class="badge bg-success">매칭됨</span>' : '<span class="badge bg-danger">미매칭</span>'}
+                    </td>
+                    <td>${record.commission_fee ? Math.round(record.commission_fee).toLocaleString() + '원' : '-'}</td>
+                    <td>${record.net_sales_krw ? Math.round(record.net_sales_krw).toLocaleString() + '원' : '-'}</td>
+                    <td>
+                        ${index === 0 && record.excel_name && record.is_matched ? 
+                            `<a href="/download/receipt/customer/${getCurrentUploadId()}/${encodeURIComponent(record.excel_name)}" 
+                               class="btn btn-sm btn-outline-success" 
+                               title="${record.excel_name}의 수령증 다운로드">
+                                <i class="fas fa-download"></i>
+                            </a>` : 
+                            '-'
+                        }
+                    </td>
+                </tr>
+            `;
+        });
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    modalContent.innerHTML = html;
+}
+
+// 세션 삭제
+function deleteSession(uploadId, sessionName) {
+    if (confirm(`"${sessionName}" 세션을 정말 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
+        fetch(`/history/delete-session/${uploadId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('세션이 삭제되었습니다.');
+                location.reload();
+            } else {
+                alert('삭제 중 오류가 발생했습니다: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('삭제 오류:', error);
+            alert('삭제 중 오류가 발생했습니다.');
+        });
     }
 }
 </script>
+
+<style>
+.table th {
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+
+.table td {
+    font-size: 0.9rem;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+.btn-sm {
+    font-size: 0.8rem;
+}
+
+.modal-xl .table {
+    font-size: 0.85rem;
+}
+
+.modal-xl .table th,
+.modal-xl .table td {
+    padding: 0.5rem;
+}
+</style>
 {% endblock %}

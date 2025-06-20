@@ -6,9 +6,10 @@ from datetime import datetime
 from decimal import Decimal
 
 def matchingResult(user_id):
-    """롯데 면세점 매칭 로직 - 간단 버전"""
+    """롯데 면세점 매칭 로직 - 상품별 저장 및 수수료 합계 계산"""
+    # 모든 상품별 매칭 결과 조회 (중복 허용 - 각 상품별로 개별 레코드)
     sql = """
-    SELECT DISTINCT 
+    SELECT 
         r.receipt_number,
         CASE
             WHEN e."receiptNumber" IS NOT NULL THEN TRUE
@@ -17,7 +18,7 @@ def matchingResult(user_id):
         e.name as excel_name,
         p.passport_number,
         p.birthday,
-        -- 롯데 추가 정보
+        -- 롯데 상품별 상세 정보
         e."매출일자" as sales_date,
         e."카테고리" as category,
         e."브랜드" as brand,
@@ -30,19 +31,27 @@ def matchingResult(user_id):
     LEFT JOIN lotte_excel_data e ON r.receipt_number = e."receiptNumber"
     LEFT JOIN passports p ON e.name = p.name AND p.user_id = :user_id
     WHERE r.user_id = :user_id
+    ORDER BY r.receipt_number, e."상품코드"
     """
 
     with SessionLocal() as session:
         results = session.execute(text(sql), {"user_id": user_id}).fetchall()
-        print(f"롯데 매칭 처리할 영수증: {len(results)}개")
+        print(f"롯데 매칭 처리할 상품: {len(results)}개")
 
-        # 1단계: 영수증 매칭 로그 저장
+        # 1단계: 기존 매칭 로그 삭제 (새로운 상품별 로그로 대체)
+        session.query(ReceiptMatchLog).filter(
+            ReceiptMatchLog.user_id == user_id,
+            ReceiptMatchLog.duty_free_type == "lotte"
+        ).delete()
+
+        # 2단계: 상품별 매칭 로그 생성
+        
         for row in results:
             (receipt_number, is_matched, excel_name, passport_number, birthday,
              sales_date, category, brand, product_code, discount_amount_krw,
              sales_price_usd, net_sales_krw, store_branch) = row
             
-            print(f"롯데 영수증: {receipt_number}, 매칭: {is_matched}, 이름: {excel_name}")
+            print(f"롯데 상품: {receipt_number}-{product_code}, 매칭: {is_matched}, 이름: {excel_name}")
             if is_matched:
                 print(f"  - 매출일자: {sales_date}")
                 print(f"  - 카테고리: {category}")
@@ -79,30 +88,56 @@ def matchingResult(user_id):
                 except (ValueError, TypeError, AttributeError):
                     return None
             
-            match_log = ReceiptMatchLog(
-                user_id=user_id,
-                receipt_number=receipt_number,
-                is_matched=is_matched,
-                excel_name=excel_name if is_matched else None,
-                passport_number=passport_number if is_matched else None,
-                birthday=birthday if is_matched else None,
-                # 상세 정보
-                sales_date=parsed_sales_date if is_matched else None,
-                category=category if is_matched else None,
-                brand=brand if is_matched else None,
-                product_code=product_code if is_matched else None,
-                discount_amount_krw=safe_float(discount_amount_krw) if is_matched else None,
-                sales_price_usd=safe_float(sales_price_usd) if is_matched else None,
-                net_sales_krw=safe_float(net_sales_krw) if is_matched else None,
-                store_branch=store_branch if is_matched else None,
-                duty_free_type="lotte"  # 롯데 면세점
-            )
-            session.add(match_log)
+            # 상품별 매칭 로그 생성 (매칭된 경우에만)
+            if is_matched and product_code:
+                match_log = ReceiptMatchLog(
+                    user_id=user_id,
+                    receipt_number=receipt_number,
+                    is_matched=is_matched,
+                    excel_name=excel_name,
+                    passport_number=passport_number,
+                    birthday=birthday,
+                    # 상세 정보
+                    sales_date=parsed_sales_date,
+                    category=category,
+                    brand=brand,
+                    product_code=product_code,
+                    discount_amount_krw=safe_float(discount_amount_krw),
+                    sales_price_usd=safe_float(sales_price_usd),
+                    net_sales_krw=safe_float(net_sales_krw),
+                    store_branch=store_branch,
+                    duty_free_type="lotte"
+                )
+                session.add(match_log)
+                
+                print(f"상품별 매칭 로그 생성: {receipt_number}-{product_code}")
+            
+            # 매칭되지 않은 영수증도 로그 생성 (상품 정보 없이)
+            elif not is_matched:
+                existing_unmatched = session.query(ReceiptMatchLog).filter(
+                    ReceiptMatchLog.receipt_number == receipt_number,
+                    ReceiptMatchLog.user_id == user_id,
+                    ReceiptMatchLog.duty_free_type == "lotte",
+                    ReceiptMatchLog.is_matched == False
+                ).first()
+                
+                if not existing_unmatched:
+                    match_log = ReceiptMatchLog(
+                        user_id=user_id,
+                        receipt_number=receipt_number,
+                        is_matched=False,
+                        excel_name=None,
+                        passport_number=None,
+                        birthday=None,
+                        duty_free_type="lotte"
+                    )
+                    session.add(match_log)
+                    print(f"매칭되지 않은 영수증 로그 생성: {receipt_number}")
 
         session.commit()
-        print("롯데 영수증 매칭 로그 저장 완료")
+        print("롯데 상품별 매칭 결과 저장 완료")
 
-        # 2단계: 여권 매칭 상태 업데이트
+        # 4단계: 여권 매칭 상태 업데이트
         passport_update_sql = """
         UPDATE passports p
         SET is_matched = TRUE
@@ -112,7 +147,7 @@ def matchingResult(user_id):
         AND e."receiptNumber" IN (
             SELECT rml.receipt_number 
             FROM receipt_match_log rml 
-            WHERE rml.user_id = :user_id AND rml.is_matched = TRUE
+            WHERE rml.user_id = :user_id AND rml.is_matched = TRUE AND rml.duty_free_type = 'lotte'
         )
         """
         updated_passports = session.execute(text(passport_update_sql), {"user_id": user_id}).rowcount

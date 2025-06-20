@@ -30,6 +30,7 @@ class User(Base):
     passports = relationship("Passport", back_populates="user")
     shilla_receipts = relationship("ShillaReceipt", back_populates="user")
     archives = relationship("ProcessingArchive", back_populates="user")
+    processing_histories = relationship("ProcessingHistory", back_populates="user")
     
     def verify_password(self, password: str) -> bool:
         return pwd_context.verify(password, self.hashed_password)
@@ -44,9 +45,11 @@ class ShillaReceipt(Base):
     
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    upload_id = Column(String(50), nullable=True)  # 업로드 ID 추가
     file_path = Column(Text, nullable=True)
     receipt_number = Column(String(50), nullable=True)
     passport_number = Column(String(20), nullable=True)
+    commission_total = Column(DECIMAL(12,2), nullable=True)  # 수수료 합계
     created_at = Column(TIMESTAMP, server_default=func.now())
     
     user = relationship("User", back_populates="shilla_receipts")
@@ -56,6 +59,7 @@ class Passport(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    upload_id = Column(String(50), nullable=True)  # 업로드 ID 추가
     file_path = Column(Text, nullable=False)
     passport_number = Column(String(20), nullable=True)
     birthday = Column(Date, nullable=True)
@@ -70,8 +74,10 @@ class Receipt(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    upload_id = Column(String(50), nullable=True)  # 업로드 ID 추가
     file_path = Column(Text, nullable=True)
     receipt_number = Column(String(50), nullable=True)
+    commission_total = Column(DECIMAL(12,2), nullable=True)  # 수수료 합계
     created_at = Column(TIMESTAMP, server_default=func.now())
 
     def __str__(self):
@@ -87,6 +93,7 @@ class ReceiptMatchLog(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    upload_id = Column(String(50), nullable=True)  # 업로드 ID 추가
     receipt_number = Column(Text, nullable=True)
     is_matched = Column(Boolean, nullable=False)
     checked_at = Column(TIMESTAMP, server_default=func.now())
@@ -118,6 +125,7 @@ class UnrecognizedImage(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    upload_id = Column(String(50), nullable=True)  # 업로드 ID 추가
     file_path = Column(Text, nullable=False)
     created_at = Column(TIMESTAMP, server_default=func.now())
     
@@ -174,3 +182,44 @@ class MatchingHistory(Base):
     
     user = relationship("User")
     archive = relationship("ProcessingArchive", back_populates="matching_histories")
+
+# === 처리 완료된 데이터 저장용 테이블 ===
+
+class ProcessingHistory(Base):
+    """처리 완료된 매칭 데이터 이력"""
+    __tablename__ = "processing_history"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    upload_id = Column(String(50), nullable=False)  # 업로드 세션 ID
+    session_name = Column(String(200), nullable=False)  # 사용자가 지정한 세션명
+    
+    # 원본 ReceiptMatchLog 데이터 복사
+    receipt_number = Column(Text, nullable=True)
+    is_matched = Column(Boolean, nullable=False)
+    excel_name = Column(String(100), nullable=True)
+    passport_number = Column(String(20), nullable=True)
+    birthday = Column(Date, nullable=True)
+    
+    # 매출 상세 정보
+    sales_date = Column(Date, nullable=True)
+    category = Column(String(100), nullable=True)
+    brand = Column(String(100), nullable=True)
+    product_code = Column(String(50), nullable=True)
+    discount_amount_krw = Column(Float, nullable=True)
+    sales_price_usd = Column(Float, nullable=True)
+    net_sales_krw = Column(Float, nullable=True)
+    store_branch = Column(String(100), nullable=True)
+    
+    # 할인율 및 수수료 계산
+    discount_rate = Column(DECIMAL(5,2), nullable=True)
+    commission_fee = Column(DECIMAL(12,2), nullable=True)
+    
+    # 면세점 타입
+    duty_free_type = Column(String(20), nullable=True)
+    
+    # 타임스탬프
+    processed_at = Column(TIMESTAMP, nullable=False)  # 원본 처리 시각
+    archived_at = Column(TIMESTAMP, server_default=func.now())  # 아카이브 시각
+    
+    user = relationship("User", back_populates="processing_histories")

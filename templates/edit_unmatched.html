@@ -20,8 +20,9 @@
                     <h5 class="card-title">영수증 이미지</h5>
                     <div class="image-container">
                         {% if receipt.file_path %}
+                        {% set filename = receipt.file_path.split('/')[-1] if '/' in receipt.file_path else receipt.file_path %}
                         <img class="receipt-image" id="receipt-image" 
-                             src="/{{ receipt.file_path }}" 
+                             src="/uploads/{{ filename }}" 
                              alt="Receipt Image" 
                              style="width: 100%; cursor: grab;">
                         {% else %}

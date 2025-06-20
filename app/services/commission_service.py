@@ -65,6 +65,16 @@ class CommissionService:
             # 변경사항 커밋
             self.session.commit()
             
+            # 수수료 합계 자동 업데이트
+            try:
+                update_result = update_commission_totals(user_id)
+                if update_result["success"]:
+                    logger.info(f"수수료 합계 자동 업데이트 완료: 신라 {update_result['shilla_updated']}개, 롯데 {update_result['lotte_updated']}개")
+                else:
+                    logger.warning(f"수수료 합계 업데이트 실패: {update_result['message']}")
+            except Exception as e:
+                logger.error(f"수수료 합계 자동 업데이트 중 오류: {e}")
+            
             return {
                 "success": True,
                 "message": f"할인율 및 수수료 계산 완료",
@@ -270,9 +280,9 @@ class CommissionService:
                 COUNT(*) as total_matched,
                 COUNT(CASE WHEN discount_rate IS NOT NULL THEN 1 END) as calculated_discount,
                 COUNT(CASE WHEN commission_fee IS NOT NULL THEN 1 END) as calculated_commission,
-                ROUND(AVG(discount_rate), 2) as avg_discount_rate,
-                ROUND(SUM(commission_fee), 2) as total_commission_fee,
-                ROUND(SUM(net_sales_krw), 2) as total_net_sales
+                ROUND(AVG(discount_rate::numeric), 2) as avg_discount_rate,
+                ROUND(SUM(commission_fee::numeric), 2) as total_commission_fee,
+                ROUND(SUM(net_sales_krw::numeric), 2) as total_net_sales
             FROM receipt_match_log 
             WHERE is_matched = TRUE
             """
@@ -309,4 +319,80 @@ def calculate_discounts_and_commissions(user_id: int = None):
 def get_commission_summary(user_id: int = None):
     """수수료 계산 결과 요약 조회 함수"""
     with CommissionService() as service:
-        return service.get_commission_summary(user_id) 
+        return service.get_commission_summary(user_id)
+
+def update_commission_totals(user_id: int = None):
+    """수수료 계산 완료 후 영수증별 수수료 합계를 receipts/shilla_receipts 테이블에 업데이트"""
+    with SessionLocal() as session:
+        try:
+            # 사용자 조건 설정
+            user_condition = f"AND user_id = {user_id}" if user_id else ""
+            
+            # 신라 면세점 수수료 합계 업데이트
+            shilla_update_sql = f"""
+            UPDATE shilla_receipts 
+            SET commission_total = (
+                SELECT COALESCE(SUM(commission_fee), 0)
+                FROM receipt_match_log 
+                WHERE receipt_match_log.receipt_number = shilla_receipts.receipt_number 
+                AND receipt_match_log.user_id = shilla_receipts.user_id
+                AND receipt_match_log.duty_free_type = 'shilla'
+                AND receipt_match_log.is_matched = TRUE
+                AND receipt_match_log.commission_fee IS NOT NULL
+            )
+            WHERE EXISTS (
+                SELECT 1 FROM receipt_match_log rml 
+                WHERE rml.receipt_number = shilla_receipts.receipt_number 
+                AND rml.user_id = shilla_receipts.user_id
+                AND rml.duty_free_type = 'shilla'
+                AND rml.is_matched = TRUE
+                {user_condition.replace('user_id', 'rml.user_id')}
+            )
+            {user_condition.replace('user_id', 'shilla_receipts.user_id')}
+            """
+            
+            shilla_updated = session.execute(text(shilla_update_sql)).rowcount
+            
+            # 롯데 면세점 수수료 합계 업데이트
+            lotte_update_sql = f"""
+            UPDATE receipts 
+            SET commission_total = (
+                SELECT COALESCE(SUM(commission_fee), 0)
+                FROM receipt_match_log 
+                WHERE receipt_match_log.receipt_number = receipts.receipt_number 
+                AND receipt_match_log.user_id = receipts.user_id
+                AND receipt_match_log.duty_free_type = 'lotte'
+                AND receipt_match_log.is_matched = TRUE
+                AND receipt_match_log.commission_fee IS NOT NULL
+            )
+            WHERE EXISTS (
+                SELECT 1 FROM receipt_match_log rml 
+                WHERE rml.receipt_number = receipts.receipt_number 
+                AND rml.user_id = receipts.user_id
+                AND rml.duty_free_type = 'lotte'
+                AND rml.is_matched = TRUE
+                {user_condition.replace('user_id', 'rml.user_id')}
+            )
+            {user_condition.replace('user_id', 'receipts.user_id')}
+            """
+            
+            lotte_updated = session.execute(text(lotte_update_sql)).rowcount
+            
+            session.commit()
+            
+            print(f"수수료 합계 업데이트 완료: 신라 {shilla_updated}개, 롯데 {lotte_updated}개")
+            
+            return {
+                "success": True,
+                "message": f"수수료 합계 업데이트 완료",
+                "shilla_updated": shilla_updated,
+                "lotte_updated": lotte_updated
+            }
+            
+        except Exception as e:
+            session.rollback()
+            logger.error(f"수수료 합계 업데이트 중 오류: {e}")
+            return {
+                "success": False,
+                "message": f"수수료 합계 업데이트 중 오류: {str(e)}"
+            } 

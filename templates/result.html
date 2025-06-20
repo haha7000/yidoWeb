@@ -6,7 +6,7 @@
         <h1>OCR 처리 결과</h1>
         <div class="d-flex gap-2">
             <a href="/history/" class="btn btn-info">
-                <i class="fas fa-history"></i> 이력 조회
+                <i class="fas fa-history"></i> 이력조회
             </a>
             <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#completeModal">
                 <i class="fas fa-check-circle"></i> 처리 완료
@@ -79,28 +79,21 @@
     <!-- 액션 버튼들 -->
     <div class="mb-4">
         <div class="row">
-            <div class="col-md-3 mb-3">
-                <div class="d-grid">
-                    <a href="/generate-receipts/" class="btn btn-success btn-lg" id="downloadBtn">
-                        <i class="fas fa-download me-2"></i>수령증 다운로드
-                    </a>
-                </div>
-            </div>
-            <div class="col-md-3 mb-3">
+            <div class="col-md-4 mb-3">
                 <div class="d-grid">
                     <a href="/unmatched-passports/" class="btn btn-warning btn-lg">
                         <i class="fas fa-passport me-2"></i>매칭안된 여권
                     </a>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
+            <div class="col-md-4 mb-3">
                 <div class="d-grid">
                     <button class="btn btn-info btn-lg" onclick="calculateCommission()">
                         <i class="fas fa-calculator me-2"></i>할인율·수수료 계산
                     </button>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
+            <div class="col-md-4 mb-3">
                 <div class="d-grid">
                     <a href="/upload/" class="btn btn-outline-primary btn-lg">
                         <i class="fas fa-upload me-2"></i>새로운 처리

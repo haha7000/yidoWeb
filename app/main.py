@@ -8,11 +8,11 @@ from app.services.LotteFinder import LotteAiOcr
 from app.services.ShillaFinder import ShillaAiOcr
 from app.services.matching import matchingResult, fetch_results
 from app.services.shilla_matching import shilla_matching_result
-from app.services.GenerateReceiptForm import get_matched_name_and_payback
 from app.core.database import SessionLocal
-from app.models.models import User, Receipt, Passport, ReceiptMatchLog, DutyFreeType, ShillaReceipt
+from app.models.models import User, Receipt, Passport, ReceiptMatchLog, DutyFreeType, ShillaReceipt, ProcessingHistory
 from app.services.data_manager import DataManager
 from app.services.archive_service import ArchiveService
+from app.services.receipt_service import ReceiptService
 from datetime import datetime
 from sqlalchemy.sql import text
 from sqlalchemy.orm import Session
@@ -27,16 +27,62 @@ from datetime import timedelta
 from passlib.context import CryptContext
 import pandas as pd
 import time
+import uuid
+from fastapi.responses import FileResponse
+from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 app = FastAPI(debug=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/uploads", StaticFiles(directory="uploads", html=True), name="uploads")
-templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory=settings.static_dir), name="static")
+app.mount("/uploads", StaticFiles(directory=settings.uploads_dir, html=True), name="uploads")
+templates = Jinja2Templates(directory=settings.templates_dir)
+
+
 
 # 진행상황 전역 변수
 progress = {"done":0, "total":0}
+
+def generate_upload_id() -> str:
+    """고유한 업로드 ID 생성"""
+    return f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
+
+def assign_upload_id_to_data(user_id: int, upload_id: str, db: Session):
+    """현재 세션의 모든 데이터에 업로드 ID 할당"""
+    try:
+        # 업로드 ID가 없는 현재 사용자의 데이터에 할당
+        db.execute(text("""
+            UPDATE receipts SET upload_id = :upload_id 
+            WHERE user_id = :user_id AND upload_id IS NULL
+        """), {"upload_id": upload_id, "user_id": user_id})
+        
+        db.execute(text("""
+            UPDATE shilla_receipts SET upload_id = :upload_id 
+            WHERE user_id = :user_id AND upload_id IS NULL
+        """), {"upload_id": upload_id, "user_id": user_id})
+        
+        db.execute(text("""
+            UPDATE passports SET upload_id = :upload_id 
+            WHERE user_id = :user_id AND upload_id IS NULL
+        """), {"upload_id": upload_id, "user_id": user_id})
+        
+        db.execute(text("""
+            UPDATE receipt_match_log SET upload_id = :upload_id 
+            WHERE user_id = :user_id AND upload_id IS NULL
+        """), {"upload_id": upload_id, "user_id": user_id})
+        
+        db.execute(text("""
+            UPDATE unrecognized_images SET upload_id = :upload_id 
+            WHERE user_id = :user_id AND upload_id IS NULL
+        """), {"upload_id": upload_id, "user_id": user_id})
+        
+        db.commit()
+        print(f"업로드 ID {upload_id} 할당 완료")
+        
+    except Exception as e:
+        print(f"업로드 ID 할당 중 오류: {e}")
+        db.rollback()
+        raise
 
 @app.get("/")
 def main_page(request: Request, db: Session = Depends(get_db)):
@@ -179,7 +225,10 @@ async def upload_excel(
         duty_free_enum = DutyFreeType.LOTTE if duty_free_type == "lotte" else DutyFreeType.SHILLA
         
         # 엑셀 파일 임시 저장
-        tmp_path = f"/tmp/{excel_file.filename}"
+        import tempfile
+        # tmp_path = f"/tmp/{excel_file.filename}"
+        temp_dir = tempfile.mkdtemp()
+        tmp_path = os.path.join(temp_dir, excel_file.filename)
         with open(tmp_path, "wb") as f:
             shutil.copyfileobj(excel_file.file, f)
         
@@ -375,7 +424,9 @@ async def upload_excel(
         # 임시 파일 삭제
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
-            tmp_path = None
+        # 임시 디렉토리도 삭제
+        if 'temp_dir' in locals() and os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
         
         processing_time = f"{time.time() - start_time:.2f}초"
         
@@ -394,6 +445,9 @@ async def upload_excel(
         # 임시 파일 정리
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
+        # 임시 디렉토리도 삭제
+        if 'temp_dir' in locals() and os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
         
         raise HTTPException(status_code=500, detail=f"엑셀 처리 중 오류: {str(e)}")
 
@@ -442,7 +496,8 @@ async def result(
     request: Request,
     folder: UploadFile = File(...),
     duty_free_type: str = Form(...),  # 폼에서 면세점 타입 받기
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
         # 시작 시간 기록
@@ -450,11 +505,15 @@ async def result(
         print(f"\n처리 시작 시간: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"선택된 면세점 타입: {duty_free_type}")
 
+        # 업로드 ID 생성
+        upload_id = generate_upload_id()
+        print(f"생성된 업로드 ID: {upload_id}")
+
         # 면세점 타입 변환
         duty_free_enum = DutyFreeType.LOTTE if duty_free_type == "lotte" else DutyFreeType.SHILLA
 
-        user_uploads_dir = f"uploads/user_{current_user.id}"
-        os.makedirs(user_uploads_dir, exist_ok=True)
+        # uploads 디렉토리 설정 (settings에서 설정된 변수 사용)
+        user_uploads_dir = settings.get_user_uploads_dir(current_user.id)
         
         # 1) ZIP 저장·해제
         tmp = tempfile.mkdtemp()
@@ -474,7 +533,7 @@ async def result(
                     f.lower().endswith((".jpg",".png",".jpeg"))):
                     # 이미지를 uploads 디렉토리로 복사
                     src_path = os.path.join(r, f)
-                    dst_path = os.path.join("uploads", f)
+                    dst_path = os.path.join(settings.uploads_dir, f)
                     shutil.copy2(src_path, dst_path)
                     imgs.append(dst_path)
 
@@ -518,10 +577,13 @@ async def result(
         else:
             shilla_matching_result(current_user.id)
 
-        # 5) 조회용 리스트 생성 (duty_free_type 매개변수 추가)
+        # 5) 업로드 ID 할당
+        assign_upload_id_to_data(current_user.id, upload_id, db)
+        
+        # 6) 조회용 리스트 생성 (duty_free_type 매개변수 추가)
         matched, unmatched = fetch_results(current_user.id, duty_free_type)
         
-        # 6) 임시 디렉터리 삭제
+        # 7) 임시 디렉터리 삭제
         shutil.rmtree(tmp)
 
         # 종료 시간 기록 및 처리 시간 계산
@@ -1473,97 +1535,140 @@ async def get_available_passports(
 async def complete_session(
     request: Request,
     session_name: str = Form(""),
-    save_to_history: bool = Form(False),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    save_to_history: bool = Form(True),  # 기본값을 True로 변경
+    current_user: User = Depends(get_current_user)
 ):
     """
     현재 세션 완료 및 데이터 초기화
-    선택적으로 이력에 저장
+    이력에 저장하고 현재 세션 초기화
     """
+    # 새로운 데이터베이스 세션 생성
+    db = SessionLocal()
+    
     try:
-        print(f"세션 완료 요청: 사용자={current_user.id}, 이력저장={save_to_history}, 세션명='{session_name}'")
+        print(f"세션 완료 요청: 사용자={current_user.id}, 세션명='{session_name}'")
         
-        # 1. 현재 상태 확인
-        stats = DataManager.get_user_statistics(current_user.id)
-        print(f"현재 상태: {stats}")
+        # 1. 현재 처리 데이터 확인
+        current_data = db.query(ReceiptMatchLog).filter(
+            ReceiptMatchLog.user_id == current_user.id
+        ).all()
         
-        if stats["total_receipts"] == 0:
+        if not current_data:
             print("처리할 데이터가 없음")
-            return templates.TemplateResponse("result.html", {
-                "request": request,
-                "user": current_user,
-                "warning": "처리할 데이터가 없습니다.",
-                "results": [],
-                "unmatched_receipts": [],
-                "duty_free_type": "lotte"
-            })
+            db.close()
+            return RedirectResponse(url="/upload/?completed=true", status_code=302)
         
-        # 2. 이력 저장 (선택사항)
-        archive_success = True
-        if save_to_history:
-            print("이력 저장 시작...")
-            archive_service = ArchiveService()
-            
-            if session_name.strip():
-                final_session_name = session_name.strip()
-            else:
-                final_session_name = f"세션_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            
-            print(f"세션명: {final_session_name}")
-            archive_success = archive_service.save_current_session_to_history(
-                current_user.id, final_session_name
-            )
-            
-            if archive_success:
-                print("이력 저장 성공")
-            else:
-                print("이력 저장 실패")
-                return templates.TemplateResponse("result.html", {
-                    "request": request,
-                    "user": current_user,
-                    "error": "이력 저장 중 오류가 발생했습니다.",
-                    "results": [],
-                    "unmatched_receipts": [],
-                    "duty_free_type": stats.get("duty_free_type", "lotte")
-                })
-        
-        # 3. 현재 세션 데이터 초기화
-        print("세션 데이터 초기화 시작...")
-        clear_success = DataManager.clear_current_session_data(current_user.id)
-        
-        if clear_success:
-            print("세션 데이터 초기화 성공")
-            # 이력 저장했으면 이력 페이지로, 아니면 업로드 페이지로
-            if save_to_history and archive_success:
-                print("이력 페이지로 리다이렉트")
-                return RedirectResponse(url="/history/", status_code=302)
-            else:
-                print("업로드 페이지로 리다이렉트")
-                return RedirectResponse(url="/upload/?completed=true", status_code=302)
+        # 2. 세션명 설정
+        if session_name.strip():
+            final_session_name = session_name.strip()
         else:
-            print("세션 데이터 초기화 실패")
-            return templates.TemplateResponse("result.html", {
-                "request": request,
-                "user": current_user,
-                "error": "데이터 초기화 중 오류가 발생했습니다.",
-                "results": [],
-                "unmatched_receipts": [],
-                "duty_free_type": stats.get("duty_free_type", "lotte")
-            })
+            final_session_name = f"세션_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        print(f"세션명: {final_session_name}")
+        print(f"처리할 레코드 수: {len(current_data)}")
+        
+        # 3. 현재 데이터를 ProcessingHistory 테이블로 이동 (개별 처리로 변경)
+        print("이력 저장 시작...")
+        
+        saved_count = 0
+        for i, record in enumerate(current_data):
+            try:
+                print(f"레코드 {i+1}/{len(current_data)} 처리 중: {record.receipt_number}")
+                
+                history_record = ProcessingHistory(
+                    user_id=record.user_id,
+                    upload_id=record.upload_id or f"legacy_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    session_name=final_session_name,
+                    receipt_number=record.receipt_number,
+                    is_matched=record.is_matched,
+                    excel_name=record.excel_name,
+                    passport_number=record.passport_number,
+                    birthday=record.birthday,
+                    sales_date=record.sales_date,
+                    category=record.category,
+                    brand=record.brand,
+                    product_code=record.product_code,
+                    discount_amount_krw=record.discount_amount_krw,
+                    sales_price_usd=record.sales_price_usd,
+                    net_sales_krw=record.net_sales_krw,
+                    store_branch=record.store_branch,
+                    discount_rate=record.discount_rate,
+                    commission_fee=record.commission_fee,
+                    duty_free_type=record.duty_free_type,
+                    processed_at=record.checked_at or datetime.now()
+                )
+                
+                db.add(history_record)
+                db.flush()  # 개별 플러시로 문제 지점 확인
+                saved_count += 1
+                print(f"레코드 {i+1} 저장 완료")
+                
+            except Exception as record_error:
+                print(f"레코드 {i+1} 저장 중 오류: {record_error}")
+                print(f"문제 레코드: receipt_number={record.receipt_number}, user_id={record.user_id}")
+                raise record_error
+        
+        print(f"이력 레코드 {saved_count}개 저장 완료")
+        
+        # 4. 현재 세션 데이터 초기화
+        print("현재 세션 데이터 초기화...")
+        
+        # receipt_match_log 테이블 초기화
+        deleted_count = db.query(ReceiptMatchLog).filter(
+            ReceiptMatchLog.user_id == current_user.id
+        ).delete()
+        print(f"receipt_match_log {deleted_count}개 삭제")
+        
+        # 다른 테이블들도 초기화
+        receipt_deleted = db.query(Receipt).filter(Receipt.user_id == current_user.id).delete()
+        shilla_deleted = db.query(ShillaReceipt).filter(ShillaReceipt.user_id == current_user.id).delete()
+        passport_deleted = db.query(Passport).filter(Passport.user_id == current_user.id).delete()
+        
+        print(f"기타 테이블 삭제: receipts={receipt_deleted}, shilla_receipts={shilla_deleted}, passports={passport_deleted}")
+        
+        # 엑셀 데이터 테이블은 보존 (다른 사용자도 사용할 수 있으므로)
+        # 엑셀 데이터는 업로드 시마다 새로 생성되므로 삭제하지 않음
+        print("엑셀 데이터 테이블은 보존됨 (다른 사용자와 공유 가능)")
+        
+        # 모든 변경사항 커밋
+        db.commit()
+        print("세션 완료 및 초기화 성공")
+        
+        # 이력 페이지로 리다이렉트
+        return RedirectResponse(url="/history/", status_code=302)
             
     except Exception as e:
         print(f"세션 완료 처리 오류: {str(e)}")
         import traceback
         traceback.print_exc()
+        
+        # 롤백 처리
+        try:
+            db.rollback()
+        except Exception as rollback_error:
+            print(f"롤백 중 오류: {rollback_error}")
+        
+        # 에러 페이지 반환
+        from app.services.matching import fetch_results
+        try:
+            matched, unmatched = fetch_results(current_user.id, "shilla")
+        except:
+            matched, unmatched = [], []
+            
         return templates.TemplateResponse("result.html", {
             "request": request,
             "user": current_user,
             "error": f"처리 중 오류가 발생했습니다: {str(e)}",
-            "results": [],
-            "unmatched_receipts": [],
-            "duty_free_type": "lotte"
+            "results": matched,
+            "unmatched_receipts": unmatched,
+            "duty_free_type": "shilla"
         })
+    finally:
+        # 데이터베이스 세션 닫기
+        try:
+            db.close()
+        except Exception as close_error:
+            print(f"DB 세션 닫기 중 오류: {close_error}")
 
 @app.get("/history/")
 async def processing_history(
@@ -1573,24 +1678,52 @@ async def processing_history(
 ):
     """처리 이력 조회 페이지"""
     try:
-        archive_service = ArchiveService()
+        # ProcessingHistory에서 세션별 요약 정보 조회
+        history_summary = db.execute(text("""
+            SELECT 
+                upload_id,
+                session_name,
+                duty_free_type,
+                MIN(archived_at) as session_date,
+                COUNT(*) as total_records,
+                COUNT(CASE WHEN is_matched = true THEN 1 END) as matched_records,
+                SUM(CASE WHEN commission_fee IS NOT NULL THEN commission_fee ELSE 0 END) as total_commission
+            FROM processing_history 
+            WHERE user_id = :user_id 
+            GROUP BY upload_id, session_name, duty_free_type
+            ORDER BY MIN(archived_at) DESC
+        """), {"user_id": current_user.id}).fetchall()
         
-        # 아카이브된 세션 목록 조회
-        archives = archive_service.get_user_archives(current_user.id)
+        # 결과를 딕셔너리로 변환
+        sessions = []
+        for row in history_summary:
+            completion_rate = (row.matched_records / row.total_records * 100) if row.total_records > 0 else 0
+            sessions.append({
+                'upload_id': row.upload_id,
+                'session_name': row.session_name,
+                'duty_free_type': row.duty_free_type,
+                'session_date': row.session_date,
+                'total_records': row.total_records,
+                'matched_records': row.matched_records,
+                'completion_rate': round(completion_rate, 1),
+                'total_commission': float(row.total_commission) if row.total_commission else 0
+            })
         
         return templates.TemplateResponse("history.html", {
             "request": request,
             "user": current_user,
-            "archives": archives
+            "sessions": sessions
         })
         
     except Exception as e:
         print(f"이력 조회 오류: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return templates.TemplateResponse("history.html", {
             "request": request,
             "user": current_user,
             "error": f"이력 조회 중 오류가 발생했습니다: {str(e)}",
-            "archives": []
+            "sessions": []
         })
 
 @app.get("/history/search/")
@@ -1603,13 +1736,75 @@ async def search_history(
 ):
     """이력 검색 API"""
     try:
-        archive_service = ArchiveService()
+        if not q.strip():
+            return {
+                "success": True,
+                "results": [],
+                "total": 0
+            }
         
-        results = archive_service.search_matching_history(
-            user_id=current_user.id,
-            query=q,
-            search_type=search_type
-        )
+        # 검색 타입에 따른 WHERE 조건 설정
+        search_conditions = []
+        params = {"user_id": current_user.id, "query": f"%{q.strip()}%"}
+        
+        if search_type == "customer" or search_type == "all":
+            search_conditions.append("excel_name ILIKE :query")
+        
+        if search_type == "passport" or search_type == "all":
+            search_conditions.append("passport_number ILIKE :query")
+        
+        if search_type == "receipt" or search_type == "all":
+            search_conditions.append("receipt_number ILIKE :query")
+        
+        if search_type == "all":
+            search_conditions.extend([
+                "brand ILIKE :query",
+                "category ILIKE :query",
+                "session_name ILIKE :query"
+            ])
+        
+        where_clause = " OR ".join(search_conditions) if search_conditions else "1=0"
+        
+        # 검색 쿼리 실행
+        search_query = text(f"""
+            SELECT 
+                upload_id,
+                session_name,
+                receipt_number,
+                excel_name,
+                passport_number,
+                brand,
+                category,
+                duty_free_type,
+                is_matched,
+                commission_fee,
+                net_sales_krw,
+                archived_at
+            FROM processing_history 
+            WHERE user_id = :user_id AND ({where_clause})
+            ORDER BY archived_at DESC
+            LIMIT 100
+        """)
+        
+        search_results = db.execute(search_query, params).fetchall()
+        
+        # 결과를 딕셔너리로 변환
+        results = []
+        for row in search_results:
+            results.append({
+                'upload_id': row.upload_id,
+                'session_name': row.session_name,
+                'receipt_number': row.receipt_number,
+                'excel_name': row.excel_name,
+                'passport_number': row.passport_number,
+                'brand': row.brand,
+                'category': row.category,
+                'duty_free_type': row.duty_free_type,
+                'is_matched': row.is_matched,
+                'commission_fee': float(row.commission_fee) if row.commission_fee else 0,
+                'net_sales_krw': float(row.net_sales_krw) if row.net_sales_krw else 0,
+                'archived_at': row.archived_at.strftime('%Y-%m-%d %H:%M:%S') if row.archived_at else ''
+            })
         
         return {
             "success": True,
@@ -1619,11 +1814,117 @@ async def search_history(
         
     except Exception as e:
         print(f"이력 검색 오류: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {
             "success": False,
             "error": str(e),
             "results": [],
             "total": 0
+        }
+
+@app.get("/history/session-detail/{upload_id}")
+async def get_session_detail(
+    upload_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """세션 상세 정보 조회"""
+    try:
+        # 특정 업로드 ID의 모든 레코드 조회
+        detail_query = text("""
+            SELECT 
+                receipt_number,
+                excel_name,
+                passport_number,
+                brand,
+                category,
+                is_matched,
+                commission_fee,
+                net_sales_krw,
+                discount_rate,
+                sales_date,
+                processed_at,
+                duty_free_type
+            FROM processing_history 
+            WHERE user_id = :user_id AND upload_id = :upload_id
+            ORDER BY processed_at DESC
+        """)
+        
+        detail_results = db.execute(detail_query, {
+            "user_id": current_user.id,
+            "upload_id": upload_id
+        }).fetchall()
+        
+        # 결과를 딕셔너리로 변환
+        details = []
+        for row in detail_results:
+            details.append({
+                'receipt_number': row.receipt_number,
+                'excel_name': row.excel_name,
+                'passport_number': row.passport_number,
+                'brand': row.brand,
+                'category': row.category,
+                'is_matched': row.is_matched,
+                'commission_fee': float(row.commission_fee) if row.commission_fee else 0,
+                'net_sales_krw': float(row.net_sales_krw) if row.net_sales_krw else 0,
+                'discount_rate': float(row.discount_rate) if row.discount_rate else 0,
+                'sales_date': row.sales_date.strftime('%Y-%m-%d') if row.sales_date else '',
+                'processed_at': row.processed_at.strftime('%Y-%m-%d %H:%M:%S') if row.processed_at else '',
+                'duty_free_type': row.duty_free_type
+            })
+        
+        return {
+            "success": True,
+            "data": details
+        }
+        
+    except Exception as e:
+        print(f"세션 상세 조회 오류: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.delete("/history/delete-session/{upload_id}")
+async def delete_session(
+    upload_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """세션 삭제"""
+    try:
+        # 해당 업로드 ID의 모든 레코드 삭제
+        deleted_count = db.execute(text("""
+            DELETE FROM processing_history 
+            WHERE user_id = :user_id AND upload_id = :upload_id
+        """), {
+            "user_id": current_user.id,
+            "upload_id": upload_id
+        }).rowcount
+        
+        db.commit()
+        
+        if deleted_count > 0:
+            print(f"세션 삭제 완료: upload_id={upload_id}, 삭제된 레코드={deleted_count}")
+            return {
+                "success": True,
+                "message": f"{deleted_count}개의 레코드가 삭제되었습니다."
+            }
+        else:
+            return {
+                "success": False,
+                "error": "삭제할 데이터를 찾을 수 없습니다."
+            }
+        
+    except Exception as e:
+        print(f"세션 삭제 오류: {str(e)}")
+        db.rollback()
+        return {
+            "success": False,
+            "error": str(e)
         }
     
 
@@ -1731,3 +2032,87 @@ async def get_commission_details_api(current_user: User = Depends(get_current_us
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"수수료 상세 조회 중 오류가 발생했습니다: {str(e)}")
+
+# ============ 수령증 다운로드 API ============
+
+@app.get("/download/receipt/session/{upload_id}")
+async def download_session_receipts(
+    upload_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """세션의 모든 고객 수령증 다운로드 (ZIP 파일)"""
+    try:
+        receipt_service = ReceiptService()
+        zip_path = receipt_service.generate_receipts_for_session(upload_id, current_user.id)
+        
+        if not zip_path or not os.path.exists(zip_path):
+            raise HTTPException(status_code=404, detail="수령증을 생성할 수 없습니다.")
+        
+        # 파일 다운로드 후 임시 파일 삭제를 위한 백그라운드 태스크
+        def cleanup_temp_file():
+            try:
+                if os.path.exists(zip_path):
+                    # ZIP 파일과 임시 디렉토리 삭제
+                    temp_dir = os.path.dirname(zip_path)
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    print(f"임시 파일 삭제 완료: {temp_dir}")
+            except Exception as e:
+                print(f"임시 파일 삭제 오류: {e}")
+        
+        # 파일 응답 반환
+        response = FileResponse(
+            path=zip_path,
+            filename="수령증.zip",
+            media_type="application/zip"
+        )
+        
+        # 다운로드 후 파일 삭제 (백그라운드에서)
+        import threading
+        threading.Timer(10.0, cleanup_temp_file).start()  # 10초 후 삭제
+        
+        return response
+        
+    except Exception as e:
+        print(f"세션 수령증 다운로드 오류: {e}")
+        raise HTTPException(status_code=500, detail=f"수령증 다운로드 중 오류가 발생했습니다: {str(e)}")
+
+@app.get("/download/receipt/customer/{upload_id}/{customer_name}")
+async def download_customer_receipt(
+    upload_id: str,
+    customer_name: str,
+    current_user: User = Depends(get_current_user)
+):
+    """특정 고객의 수령증 다운로드"""
+    try:
+        receipt_service = ReceiptService()
+        receipt_path = receipt_service.generate_receipt_for_customer(upload_id, customer_name, current_user.id)
+        
+        if not receipt_path or not os.path.exists(receipt_path):
+            raise HTTPException(status_code=404, detail="수령증을 생성할 수 없습니다.")
+        
+        # 파일 다운로드 후 임시 파일 삭제를 위한 백그라운드 태스크
+        def cleanup_temp_file():
+            try:
+                temp_dir = os.path.dirname(receipt_path)
+                if os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    print(f"임시 파일 삭제 완료: {temp_dir}")
+            except Exception as e:
+                print(f"임시 파일 삭제 오류: {e}")
+        
+        # 파일 응답 반환
+        response = FileResponse(
+            path=receipt_path,
+            filename=f"{customer_name}의 수령증.xlsx",
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        
+        # 다운로드 후 파일 삭제 (백그라운드에서)
+        import threading
+        threading.Timer(10.0, cleanup_temp_file).start()  # 10초 후 삭제
+        
+        return response
+        
+    except Exception as e:
+        print(f"고객 수령증 다운로드 오류: {e}")
+        raise HTTPException(status_code=500, detail=f"수령증 다운로드 중 오류가 발생했습니다: {str(e)}")

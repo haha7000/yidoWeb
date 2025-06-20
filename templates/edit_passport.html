@@ -14,8 +14,9 @@
                     <h5 class="card-title">여권 이미지</h5>
                     <div class="image-container">
                         {% if passport.file_path %}
+                        {% set filename = passport.file_path.split('/')[-1] if '/' in passport.file_path else passport.file_path %}
                         <img class="passport-image" id="passport-image" 
-                             src="/{{ passport.file_path }}" 
+                             src="/uploads/{{ filename }}" 
                              alt="Passport Image" 
                              style="width: 100%; cursor: grab;">
                         {% else %}

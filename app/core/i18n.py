@@ -3,6 +3,7 @@ import json
 import os
 from typing import Dict, Any, Optional
 from fastapi import Request
+from app.core.config import settings
 
 class I18n:
     def __init__(self):
@@ -13,7 +14,8 @@ class I18n:
     
     def load_translations(self):
         """번역 파일들을 로드합니다."""
-        translations_dir = "translations"
+        # 설정에서 translations 디렉토리 경로 가져오기
+        translations_dir = settings.translations_dir
         
         for lang in self.supported_langs:
             file_path = os.path.join(translations_dir, f"{lang}.json")

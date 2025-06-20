@@ -122,7 +122,8 @@
 <script>
     function showImage(imagePath) {
         const modalImage = document.getElementById('modalImage');
-        modalImage.src = '/' + imagePath;
+        const filename = imagePath.split('/').pop();
+        modalImage.src = '/uploads/' + filename;
         setCurrentImage('modalImage');
         resetZoom();
     }
