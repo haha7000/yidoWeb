@@ -27,38 +27,67 @@
             <div class="card shadow-sm">
                 <div class="card-body">
                     <div class="row text-center">
-                        <div class="col-6 col-md-3 mb-3 mb-md-0">
+                        <div class="col-6 col-lg-2 col-md-4 mb-3 mb-lg-0">
                             <div class="stat-item">
-                                <div class="stat-number text-success">{{ results|length }}</div>
-                                <div class="stat-label">매칭된 고객</div>
+                                <div class="stat-number text-info">{{ results|length }}</div>
+                                <div class="stat-label">고객수</div>
                             </div>
                         </div>
-                        <div class="col-6 col-md-3 mb-3 mb-md-0">
+                        <div class="col-6 col-lg-2 col-md-4 mb-3 mb-lg-0">
+                            <div class="stat-item">
+                                <div class="stat-number text-success">{{ fully_matched_customers or 0 }}</div>
+                                <div class="stat-label">완전 매칭</div>
+                                <small class="text-muted">영수증+여권</small>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-2 col-md-4 mb-3 mb-lg-0">
                             <div class="stat-item">
                                 {% set total_receipts = 0 %}
                                 {% for customer in results %}
-                                    {% set total_receipts = total_receipts + customer.receipt_numbers|length %}
+                                    {% if customer.receipt_numbers %}
+                                        {% set total_receipts = total_receipts + customer.receipt_numbers|length %}
+                                    {% endif %}
                                 {% endfor %}
-                                <div class="stat-number text-primary">{{ total_receipts }}</div>
+                                <div class="stat-number text-primary">{{ results|length }}</div>
                                 <div class="stat-label">매칭된 영수증</div>
                             </div>
                         </div>
-                        <div class="col-6 col-md-3 mb-3 mb-md-0">
+                        <div class="col-6 col-lg-2 col-md-4 mb-3 mb-lg-0">
                             <div class="stat-item">
                                 <div class="stat-number text-warning">{{ unmatched_receipts|length }}</div>
-                                <div class="stat-label">미매칭 영수증</div>
+                                <div class="stat-label">매칭안된 영수증</div>
                             </div>
                         </div>
-                        <div class="col-6 col-md-3">
+                        <div class="col-6 col-lg-2 col-md-4 mb-3 mb-lg-0">
                             <div class="stat-item">
-                                <div class="stat-number text-info">{{ total_receipts + unmatched_receipts|length }}</div>
-                                <div class="stat-label">전체 영수증</div>
+                                <div class="stat-number text-success">{{ passport_stats.matched_passports or 0 }}</div>
+                                <div class="stat-label">매칭된 여권</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-2 col-md-4 mb-3 mb-lg-0">
+                            <div class="stat-item">
+                                <div class="stat-number text-danger">{{ passport_stats.unmatched_passports or 0 }}</div>
+                                <div class="stat-label">매칭안된 여권</div>
                             </div>
                         </div>
                     </div>
                     
+                    <!-- 완성률 표시 (별도 행으로) -->
+                    <!-- <div class="row text-center mt-3">
+                        <div class="col-12">
+                            <div class="stat-item">
+                                {% set total_items = (total_receipts + unmatched_receipts|length + passport_stats.total_passports) %}
+                                {% set matched_items = (total_receipts + passport_stats.matched_passports) %}
+                                {% set completion_rate = (matched_items / total_items * 100) if total_items > 0 else 0 %}
+                                <div class="stat-number text-success h3">{{ "%.1f"|format(completion_rate) }}%</div>
+                                <div class="stat-label">완성율</div>
+                                <small class="text-muted">매칭된 영수증 + 여권 / 전체 항목</small>
+                            </div>
+                        </div>
+                    </div> -->
+                    
                     <!-- 진행률 바 -->
-                    <div class="mt-4">
+                    <!-- <div class="mt-4">
                         {% set completion_rate = ((total_receipts / (total_receipts + unmatched_receipts|length)) * 100) if (total_receipts + unmatched_receipts|length) > 0 else 0 %}
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="fw-bold">처리 진행률</span>
@@ -70,7 +99,7 @@
                                  aria-valuenow="{{ completion_rate }}" aria-valuemin="0" aria-valuemax="100">
                             </div>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             </div>
         </div>
@@ -79,21 +108,28 @@
     <!-- 액션 버튼들 -->
     <div class="mb-4">
         <div class="row">
-            <div class="col-md-4 mb-3">
+            <div class="col-md-3 mb-3">
                 <div class="d-grid">
                     <a href="/unmatched-passports/" class="btn btn-warning btn-lg">
                         <i class="fas fa-passport me-2"></i>매칭안된 여권
                     </a>
                 </div>
             </div>
-            <div class="col-md-4 mb-3">
+            <div class="col-md-3 mb-3">
+                <div class="d-grid">
+                    <a href="/unrecognized-images/" class="btn btn-secondary btn-lg">
+                        <i class="fas fa-question-circle me-2"></i>인식안된 이미지
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
                 <div class="d-grid">
                     <button class="btn btn-info btn-lg" onclick="calculateCommission()">
                         <i class="fas fa-calculator me-2"></i>할인율·수수료 계산
                     </button>
                 </div>
             </div>
-            <div class="col-md-4 mb-3">
+            <div class="col-md-3 mb-3">
                 <div class="d-grid">
                     <a href="/upload/" class="btn btn-outline-primary btn-lg">
                         <i class="fas fa-upload me-2"></i>새로운 처리
@@ -450,9 +486,12 @@
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle"></i>
                         <strong>현재 처리 상태:</strong><br>
-                        매칭된 고객: {{ results|length }}명<br>
-                        처리된 영수증: {{ total_receipts }}건<br>
-                        미처리 영수증: {{ unmatched_receipts|length }}건
+                        고객 수: {{ results|length }}명<br>
+                        완전 매칭: {{ fully_matched_customers or 0 }}명 (영수증+여권)<br>
+                        매칭된 영수증: {{ total_receipts }}건<br>
+                        매칭안된 영수증: {{ unmatched_receipts|length }}건<br>
+                        매칭된 여권: {{ passport_stats.matched_passports or 0 }}개<br>
+                        매칭안된 여권: {{ passport_stats.unmatched_passports or 0 }}개
                     </div>
                     
                     <div class="mb-3 form-check">

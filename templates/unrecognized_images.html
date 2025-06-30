@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-question-circle text-warning"></i> 인식되지 않은 이미지 관리
+        </h2>
+        <div>
+            <span class="badge bg-info">사용자: {{ user.username }}</span>
+            <span class="badge bg-warning ms-2" id="total-count">로딩 중...</span>
+            <button type="button" class="btn btn-danger btn-sm ms-2" onclick="showDeleteAllModal()" id="delete-all-btn" style="display: none;">
+                <i class="fas fa-trash-alt"></i> 전체 삭제
+            </button>
+        </div>
+    </div>
+    
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <strong>안내:</strong> 영수증도 여권도 아닌 것으로 인식한 이미지들입니다. 
+        각 이미지를 확인하여 올바른 유형으로 분류하거나 삭제하세요.
+    </div>
+    
+    <!-- 에러/성공 메시지 -->
+    <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+    <div id="success-message" class="alert alert-success" style="display: none;"></div>
+    
+    <!-- 이미지 목록 -->
+    <div class="row" id="images-container">
+        <div class="col-12 text-center p-5">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">로딩 중...</span>
+            </div>
+            <p class="mt-3">인식되지 않은 이미지를 불러오는 중...</p>
+        </div>
+    </div>
+</div>
+
+<!-- 유형 변경 모달 -->
+<div class="modal fade" id="changeTypeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">이미지 유형 변경</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    <img id="modal-image" src="" alt="선택된 이미지" style="max-width: 100%; max-height: 300px;">
+                </div>
+                <p>이 이미지의 올바른 유형을 선택하세요:</p>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-primary" onclick="changeType('receipt')">
+                        <i class="fas fa-receipt"></i> 영수증으로 분류
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="changeType('passport')">
+                        <i class="fas fa-passport"></i> 여권으로 분류
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="changeType('delete')">
+                        <i class="fas fa-trash"></i> 삭제
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 전체 삭제 확인 모달 -->
+<div class="modal fade" id="deleteAllModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">
+                    <i class="fas fa-exclamation-triangle"></i> 전체 삭제 확인
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-warning"></i>
+                    <strong>주의:</strong> 이 작업은 되돌릴 수 없습니다!
+                </div>
+                <p>정말로 모든 인식되지 않은 이미지를 삭제하시겠습니까?</p>
+                <p class="text-muted">
+                    <span id="delete-count">0</span>개의 이미지가 완전히 삭제됩니다.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> 아니오
+                </button>
+                <button type="button" class="btn btn-danger" onclick="deleteAllImages()">
+                    <i class="fas fa-trash"></i> 네, 삭제합니다
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentImageId = null;
+let currentImages = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadUnrecognizedImages();
+});
+
+// 인식되지 않은 이미지 목록 로드
+async function loadUnrecognizedImages() {
+    try {
+        const response = await fetch('/api/unrecognized-images/');
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        currentImages = data.images || [];
+        document.getElementById('total-count').textContent = `${currentImages.length}개`;
+        
+        // 전체 삭제 버튼 표시/숨김
+        const deleteAllBtn = document.getElementById('delete-all-btn');
+        if (currentImages.length > 0) {
+            deleteAllBtn.style.display = 'inline-block';
+        } else {
+            deleteAllBtn.style.display = 'none';
+        }
+        
+        const container = document.getElementById('images-container');
+        container.innerHTML = '';
+        
+        if (currentImages.length === 0) {
+            container.innerHTML = `
+                <div class="col-12 text-center p-5">
+                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                    <h4>모든 이미지가 분류되었습니다!</h4>
+                    <p class="text-muted">인식되지 않은 이미지가 없습니다.</p>
+                    <a href="/result/" class="btn btn-primary">결과 페이지로 돌아가기</a>
+                </div>
+            `;
+            return;
+        }
+        
+        // 이미지 카드 생성
+        currentImages.forEach((image, index) => {
+            const filename = image.file_path.split('/').pop();
+            const imageUrl = `/uploads/${filename}`;
+            
+            const cardHtml = `
+                <div class="col-lg-3 col-md-4 col-sm-6 mb-4" id="image-card-${image.id}">
+                    <div class="card h-100">
+                        <div class="card-img-top position-relative" style="height: 200px; overflow: hidden;">
+                            <img src="${imageUrl}" 
+                                 alt="인식되지 않은 이미지" 
+                                 style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;"
+                                 onclick="showChangeTypeModal(${image.id}, '${imageUrl}')">
+                            <div class="position-absolute top-0 end-0 m-2">
+                                <span class="badge bg-warning">#${index + 1}</span>
+                            </div>
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <h6 class="card-title text-truncate" title="${filename}">${filename}</h6>
+                            <p class="card-text text-muted small">
+                                업로드: ${new Date(image.created_at).toLocaleString('ko-KR')}
+                            </p>
+                            <div class="mt-auto">
+                                <button class="btn btn-outline-primary btn-sm w-100" 
+                                        onclick="showChangeTypeModal(${image.id}, '${imageUrl}')">
+                                    <i class="fas fa-edit"></i> 유형 변경
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            container.insertAdjacentHTML('beforeend', cardHtml);
+        });
+        
+    } catch (error) {
+        console.error('인식되지 않은 이미지 로드 오류:', error);
+        document.getElementById('images-container').innerHTML = `
+            <div class="col-12 text-center p-5">
+                <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
+                <h4>로딩 오류</h4>
+                <p class="text-danger">이미지를 불러오는 중 오류가 발생했습니다: ${error.message}</p>
+                <button class="btn btn-primary" onclick="loadUnrecognizedImages()">다시 시도</button>
+            </div>
+        `;
+    }
+}
+
+// 유형 변경 모달 표시
+function showChangeTypeModal(imageId, imageUrl) {
+    currentImageId = imageId;
+    document.getElementById('modal-image').src = imageUrl;
+    
+    const modal = new bootstrap.Modal(document.getElementById('changeTypeModal'));
+    modal.show();
+}
+
+// 유형 변경 실행
+async function changeType(newType) {
+    if (!currentImageId) return;
+    
+    try {
+        const formData = new FormData();
+        formData.append('item_id', currentImageId);
+        formData.append('current_type', 'unrecognized');
+        formData.append('new_type', newType);
+        
+        const response = await fetch('/api/change-type/', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showSuccess(result.message);
+            
+            // 모달 닫기
+            const modal = bootstrap.Modal.getInstance(document.getElementById('changeTypeModal'));
+            modal.hide();
+            
+            // 해당 카드 제거
+            const card = document.getElementById(`image-card-${currentImageId}`);
+            if (card) {
+                card.remove();
+            }
+            
+            // 목록 업데이트
+            currentImages = currentImages.filter(img => img.id !== currentImageId);
+            document.getElementById('total-count').textContent = `${currentImages.length}개`;
+            
+            // 모든 이미지가 처리된 경우
+            if (currentImages.length === 0) {
+                setTimeout(() => {
+                    loadUnrecognizedImages();
+                }, 1000);
+            }
+            
+            currentImageId = null;
+            
+        } else {
+            showError(result.message || '유형 변경 중 오류가 발생했습니다.');
+        }
+        
+    } catch (error) {
+        console.error('유형 변경 오류:', error);
+        showError('네트워크 오류가 발생했습니다.');
+    }
+}
+
+// 메시지 표시 함수들
+function showError(message) {
+    const errorDiv = document.getElementById('error-message');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 5000);
+}
+
+function showSuccess(message) {
+    const successDiv = document.getElementById('success-message');
+    successDiv.textContent = message;
+    successDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        successDiv.style.display = 'none';
+    }, 3000);
+}
+
+// 전체 삭제 모달 표시
+function showDeleteAllModal() {
+    if (currentImages.length === 0) {
+        showError('삭제할 이미지가 없습니다.');
+        return;
+    }
+    
+    document.getElementById('delete-count').textContent = currentImages.length;
+    const modal = new bootstrap.Modal(document.getElementById('deleteAllModal'));
+    modal.show();
+}
+
+// 전체 삭제 실행
+async function deleteAllImages() {
+    if (currentImages.length === 0) {
+        showError('삭제할 이미지가 없습니다.');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/delete-all-unrecognized/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // 모달 닫기
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteAllModal'));
+            modal.hide();
+            
+            showSuccess(`${result.deleted_count}개의 이미지가 삭제되었습니다.`);
+            
+            // 목록 새로고침
+            setTimeout(() => {
+                loadUnrecognizedImages();
+            }, 1000);
+            
+        } else {
+            showError(result.message || '전체 삭제 중 오류가 발생했습니다.');
+        }
+        
+    } catch (error) {
+        console.error('전체 삭제 오류:', error);
+        showError('네트워크 오류가 발생했습니다.');
+    }
+}
+</script>
+
+<style>
+.card-img-top img:hover {
+    transform: scale(1.05);
+    transition: transform 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transition: box-shadow 0.2s ease;
+}
+</style>
+{% endblock %} 

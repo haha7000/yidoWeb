@@ -4,7 +4,10 @@
 <div class="container mt-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>여권 정보 수정</h2>
+        <div>
         <span class="badge bg-info">사용자: {{ user.username }}</span>
+            <span class="badge bg-warning ms-2" id="remaining-count">남은 여권: 계산 중...</span>
+        </div>
     </div>
     
     <div class="row">
@@ -18,7 +21,9 @@
                         <img class="passport-image" id="passport-image" 
                              src="/uploads/{{ filename }}" 
                              alt="Passport Image" 
-                             style="width: 100%; cursor: grab;">
+                             style="width: 100%; cursor: grab;"
+                             onload="console.log('edit_passport.html 이미지 로드됨:', this.src)"
+                             onerror="console.log('edit_passport.html 이미지 로드 실패:', this.src)">
                         {% else %}
                         <div class="text-center p-5 text-muted">
                             <i class="fas fa-passport fa-3x mb-3"></i>
@@ -56,8 +61,10 @@
                     
                     <!-- 에러 메시지 표시 영역 -->
                     <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+                    <div id="success-message" class="alert alert-success" style="display: none;"></div>
                     
-                    <form id="update-passport-form" method="POST" action="/update_passport/{{ name }}">
+                    <form id="update-passport-form" method="POST" 
+                          action="{% if request.url.path.startswith('/edit_passport_by_id/') %}/update_passport_by_id/{{ passport.id }}{% else %}/update_passport/{{ name }}{% endif %}">
                         <div class="mb-3">
                             <label for="new_name" class="form-label">이름 <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="new_name" name="new_name" 
@@ -80,11 +87,17 @@
                         </div>
                         
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> 저장
+                            <button type="submit" class="btn btn-primary" id="save-btn">
+                                <i class="fas fa-save"></i> 저장 및 다음으로
+                            </button>
+                            <button type="button" class="btn btn-outline-warning" onclick="skipToNext()" id="skip-btn">
+                                <i class="fas fa-forward"></i> 건너뛰고 다음으로
+                            </button>
+                            <button type="button" class="btn btn-outline-info" onclick="showChangeTypeModal()">
+                                <i class="fas fa-exchange-alt"></i> 유형 변경
                             </button>
                             <a href="/unmatched-passports/" class="btn btn-outline-secondary">
-                                <i class="fas fa-arrow-left"></i> 취소
+                                <i class="fas fa-list"></i> 전체 목록으로
                             </a>
                         </div>
                     </form>
@@ -92,13 +105,241 @@
             </div>
         </div>
     </div>
+    
+    <!-- 매칭되지 않은 여권 리스트 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i> 매칭되지 않은 여권 목록
+                        <span class="badge bg-warning text-dark ms-2" id="total-unmatched">로딩 중...</span>
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th width="5%">#</th>
+                                    <th width="25%">이름</th>
+                                    <th width="25%">여권번호</th>
+                                    <th width="20%">생년월일</th>
+                                    <th width="15%">상태</th>
+                                    <th width="10%">작업</th>
+                                </tr>
+                            </thead>
+                            <tbody id="unmatched-list">
+                                <tr>
+                                    <td colspan="6" class="text-center p-3">
+                                        <div class="spinner-border spinner-border-sm" role="status">
+                                            <span class="visually-hidden">로딩 중...</span>
+                                        </div>
+                                        매칭되지 않은 여권 목록을 불러오는 중...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 유형 변경 모달 -->
+<div class="modal fade" id="changeTypeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">이미지 유형 변경</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    {% if passport.file_path %}
+                    {% set filename = passport.file_path.split('/')[-1] if '/' in passport.file_path else passport.file_path %}
+                    <img src="/uploads/{{ filename }}" alt="선택된 이미지" style="max-width: 100%; max-height: 300px;">
+                    {% endif %}
+                </div>
+                <p>이 이미지가 실제로는 다른 유형이라면 올바른 유형을 선택하세요:</p>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-primary" onclick="changeItemType('receipt')">
+                        <i class="fas fa-receipt"></i> 영수증으로 분류
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="changeItemType('unrecognized')">
+                        <i class="fas fa-question-circle"></i> 인식안된 이미지로 분류
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="changeItemType('delete')">
+                        <i class="fas fa-trash"></i> 삭제
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
+let currentPassportName = "{{ name }}";
+let unmatchedPassports = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('edit_passport.html 로드됨');
+    console.log('passport.file_path:', '{{ passport.file_path }}');
+    console.log('passport.name:', '{{ passport.name }}');
+    console.log('passport.id:', '{{ passport.id }}');
+    loadUnmatchedPassports();
+    updateRemainingCount();
+});
+
+// 매칭되지 않은 여권 목록 로드
+async function loadUnmatchedPassports() {
+    try {
+        const response = await fetch('/unmatched-passports/');
+        const html = await response.text();
+        
+        // HTML에서 여권 데이터 추출 (간단한 방법)
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const passportElements = doc.querySelectorAll('tbody tr');
+        
+        const tbody = document.getElementById('unmatched-list');
+        tbody.innerHTML = '';
+        
+        if (passportElements.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center p-3 text-success">
+                        <i class="fas fa-check-circle"></i> 모든 여권이 매칭되었습니다!
+                    </td>
+                </tr>
+            `;
+            document.getElementById('total-unmatched').textContent = '0개';
+            return;
+        }
+        
+        let currentIndex = -1;
+        passportElements.forEach((row, index) => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 3) {
+                const name = cells[0].textContent.trim();
+                const passportNumber = cells[1].textContent.trim();
+                const birthday = cells[2].textContent.trim();
+                
+                if (name === currentPassportName) {
+                    currentIndex = index;
+                }
+                
+                const tr = document.createElement('tr');
+                tr.className = name === currentPassportName ? 'table-warning' : '';
+                tr.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td><strong>${name}</strong></td>
+                    <td><code>${passportNumber || '없음'}</code></td>
+                    <td>${birthday || '없음'}</td>
+                    <td>
+                        ${name === currentPassportName ? 
+                            '<span class="badge bg-warning text-dark">현재 편집 중</span>' : 
+                            '<span class="badge bg-secondary">대기 중</span>'
+                        }
+                    </td>
+                    <td>
+                        ${name === currentPassportName ? 
+                            '<i class="fas fa-edit text-warning"></i>' : 
+                            `<a href="/edit_passport/${encodeURIComponent(name)}" class="btn btn-sm btn-outline-primary">편집</a>`
+                        }
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+        });
+        
+        document.getElementById('total-unmatched').textContent = `${passportElements.length}개`;
+        
+        // 남은 개수 업데이트
+        const remaining = Math.max(0, passportElements.length - currentIndex - 1);
+        document.getElementById('remaining-count').textContent = `남은 여권: ${remaining}개`;
+        
+    } catch (error) {
+        console.error('매칭되지 않은 여권 목록 로드 오류:', error);
+        document.getElementById('unmatched-list').innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center p-3 text-danger">
+                    <i class="fas fa-exclamation-triangle"></i> 목록을 불러오는 중 오류가 발생했습니다.
+                </td>
+            </tr>
+        `;
+    }
+}
+
+// 남은 개수 업데이트
+function updateRemainingCount() {
+    // 이미 loadUnmatchedPassports에서 처리됨
+}
+
+// 다음 여권으로 건너뛰기
+async function skipToNext() {
+    try {
+        // 현재 페이지가 ID 기반인지 확인
+        const isIdBased = window.location.pathname.startsWith('/edit_passport_by_id/');
+        
+        let response, data;
+        
+        if (isIdBased) {
+            // ID 기반 API 호출
+            console.log('현재 여권 ID:', '{{ passport.id }}');
+            response = await fetch(`/api/next-unmatched-passport-by-id/?current_id={{ passport.id }}`);
+        } else {
+            // 이름 기반 API 호출
+            console.log('현재 여권 이름:', currentPassportName);
+            response = await fetch(`/api/next-unmatched-passport/?current_name=${encodeURIComponent(currentPassportName)}`);
+        }
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        data = await response.json();
+        console.log('API 응답:', data);
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        if (data.next_passport && data.has_more) {
+            showSuccess('다음 여권으로 이동합니다...');
+            
+            if (isIdBased) {
+                console.log('다음 여권으로 이동 (ID):', data.next_passport.id, data.next_passport.name);
+                setTimeout(() => {
+                    window.location.href = `/edit_passport_by_id/${data.next_passport.id}`;
+                }, 500);
+            } else {
+                console.log('다음 여권으로 이동 (이름):', data.next_passport.name);
+                setTimeout(() => {
+                    window.location.href = `/edit_passport/${encodeURIComponent(data.next_passport.name)}`;
+                }, 500);
+            }
+        } else {
+            showSuccess('모든 여권 처리가 완료되었습니다!');
+            console.log('더 이상 처리할 여권이 없음');
+            setTimeout(() => {
+                window.location.href = '/unmatched-passports/';
+            }, 1500);
+        }
+    } catch (error) {
+        console.error('다음 여권 조회 오류:', error);
+        showError(`다음 여권을 찾는 중 오류가 발생했습니다: ${error.message}`);
+    }
+}
+
     // 폼 제출 처리
     document.getElementById('update-passport-form').addEventListener('submit', async function(e) {
         e.preventDefault();
-        clearError();
+    clearMessages();
 
         const nameInput = document.querySelector('input[name="new_name"]');
         const newName = nameInput.value.trim();
@@ -110,6 +351,13 @@
         }
 
         nameInput.classList.remove('input-error');
+    
+    // 버튼 비활성화
+    const saveBtn = document.getElementById('save-btn');
+    const skipBtn = document.getElementById('skip-btn');
+    saveBtn.disabled = true;
+    skipBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
         
         const formData = new FormData(this);
         
@@ -120,8 +368,12 @@
             });
             
             if (response.ok) {
-                // 성공 시 매칭안된 여권 페이지로 리다이렉트
-                window.location.href = '/unmatched-passports/';
+            showSuccess('여권 정보가 저장되었습니다. 다음 여권으로 이동합니다...');
+            
+            // 1초 후 자동 리다이렉트 (서버에서 이미 처리됨)
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
             } else {
                 // 오류 처리
                 const contentType = response.headers.get('Content-Type');
@@ -141,7 +393,131 @@
             console.error('Error updating passport:', error);
             showError('네트워크 오류가 발생했습니다.');
             nameInput.classList.add('input-error');
+    } finally {
+        // 버튼 복원
+        saveBtn.disabled = false;
+        skipBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fas fa-save"></i> 저장 및 다음으로';
         }
     });
+
+// 메시지 표시 함수들
+function showError(message) {
+    const errorDiv = document.getElementById('error-message');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 5000);
+}
+
+function showSuccess(message) {
+    const successDiv = document.getElementById('success-message');
+    successDiv.textContent = message;
+    successDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        successDiv.style.display = 'none';
+    }, 3000);
+}
+
+function clearMessages() {
+    document.getElementById('error-message').style.display = 'none';
+    document.getElementById('success-message').style.display = 'none';
+}
+
+// 유형 변경 모달 표시
+function showChangeTypeModal() {
+    const modal = new bootstrap.Modal(document.getElementById('changeTypeModal'));
+    modal.show();
+}
+
+// 유형 변경 실행
+async function changeItemType(newType) {
+    try {
+        console.log('유형 변경 시작:', newType);
+        console.log('여권 ID:', '{{ passport.id }}');
+        
+        const formData = new FormData();
+        formData.append('item_id', '{{ passport.id }}');
+        formData.append('passport_name', '{{ passport.name }}');
+        formData.append('current_type', 'passport');
+        formData.append('new_type', newType);
+        
+        console.log('FormData 내용:');
+        for (let [key, value] of formData.entries()) {
+            console.log(key, value);
+        }
+        
+        const response = await fetch('/api/change-type/', {
+            method: 'POST',
+            body: formData
+        });
+        
+        console.log('응답 상태:', response.status);
+        console.log('응답 헤더:', response.headers.get('content-type'));
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('서버 오류 응답:', errorText);
+            throw new Error(`서버 오류 (${response.status}): ${errorText}`);
+        }
+        
+        const result = await response.json();
+        console.log('서버 응답:', result);
+        
+        if (result.success) {
+            // 모달 닫기
+            const modal = bootstrap.Modal.getInstance(document.getElementById('changeTypeModal'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            showSuccess(result.message);
+            
+            // 페이지 이동 또는 새로고침
+            if (newType === 'receipt') {
+                setTimeout(() => {
+                    window.location.href = `/edit_unmatched/${result.new_id}`;
+                }, 1000);
+            } else if (newType === 'unrecognized') {
+                setTimeout(() => {
+                    window.location.href = '/unrecognized-images/';
+                }, 1000);
+            } else if (newType === 'delete') {
+                setTimeout(() => {
+                    window.location.href = '/unmatched-passports/';
+                }, 1000);
+            }
+        } else {
+            showError(result.message || '유형 변경 중 오류가 발생했습니다.');
+        }
+        
+    } catch (error) {
+        console.error('유형 변경 오류:', error);
+        showError(`네트워크 오류가 발생했습니다: ${error.message}`);
+    }
+}
+
+// 이미지 줌 기능들은 기존과 동일하게 유지
+// ... (기존 줌 관련 스크립트들)
 </script>
+
+<style>
+.input-error {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+}
+
+.table-warning {
+    background-color: rgba(255, 193, 7, 0.2) !important;
+}
+
+.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+</style>
 {% endblock %}

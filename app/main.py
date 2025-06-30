@@ -9,7 +9,7 @@ from app.services.ShillaFinder import ShillaAiOcr
 from app.services.matching import matchingResult, fetch_results
 from app.services.shilla_matching import shilla_matching_result
 from app.core.database import SessionLocal
-from app.models.models import User, Receipt, Passport, ReceiptMatchLog, DutyFreeType, ShillaReceipt, ProcessingHistory
+from app.models.models import User, Receipt, Passport, ReceiptMatchLog, DutyFreeType, ShillaReceipt, ProcessingHistory, UnrecognizedImage
 from app.services.data_manager import DataManager
 from app.services.archive_service import ArchiveService
 from app.services.receipt_service import ReceiptService
@@ -83,6 +83,86 @@ def assign_upload_id_to_data(user_id: int, upload_id: str, db: Session):
         print(f"업로드 ID 할당 중 오류: {e}")
         db.rollback()
         raise
+
+def calculate_fully_matched_customers(user_id: int, duty_free_type: str, db: Session) -> int:
+    """영수증과 여권이 모두 매칭된 고객 수 계산"""
+    try:
+        if duty_free_type == "shilla":
+            # 신라 면세점: 영수증에 여권번호가 있고, 해당 여권번호가 passports 테이블에 존재하는 경우
+            sql = text("""
+                SELECT COUNT(DISTINCT sr.passport_number) as fully_matched_count
+                FROM shilla_receipts sr
+                INNER JOIN passports p ON sr.passport_number = p.passport_number 
+                    AND sr.user_id = p.user_id
+                WHERE sr.user_id = :user_id 
+                    AND sr.passport_number IS NOT NULL 
+                    AND sr.passport_number != ''
+                    AND p.passport_number IS NOT NULL
+                    AND p.passport_number != ''
+            """)
+        else:
+            # 롯데 면세점: receipt_match_log에서 매칭된 고객 중 여권 정보가 완전한 경우
+            sql = text("""
+                SELECT COUNT(DISTINCT rml.excel_name) as fully_matched_count
+                FROM receipt_match_log rml
+                INNER JOIN passports p ON rml.excel_name = p.name 
+                    AND rml.user_id = p.user_id
+                WHERE rml.user_id = :user_id 
+                    AND rml.is_matched = TRUE
+                    AND rml.excel_name IS NOT NULL
+                    AND rml.passport_number IS NOT NULL
+                    AND rml.passport_number != ''
+                    AND p.passport_number IS NOT NULL
+                    AND p.passport_number != ''
+            """)
+        
+        result = db.execute(sql, {"user_id": user_id}).fetchone()
+        fully_matched_count = result.fully_matched_count if result else 0
+        
+        print(f"영수증+여권 모두 매칭된 고객 수 ({duty_free_type}): {fully_matched_count}명")
+        return fully_matched_count
+        
+    except Exception as e:
+        print(f"완전 매칭 고객 수 계산 중 오류: {str(e)}")
+        return 0
+
+def calculate_passport_statistics(user_id: int, duty_free_type: str, db: Session) -> dict:
+    """여권 매칭 통계 계산 - is_matched 필드 기준으로 정확하게 계산"""
+    try:
+        # 전체 여권 수
+        total_passports_sql = text("""
+            SELECT COUNT(*) as total_count
+            FROM passports 
+            WHERE user_id = :user_id
+        """)
+        total_passports = db.execute(total_passports_sql, {"user_id": user_id}).scalar() or 0
+        
+        # 매칭된 여권 수 (is_matched = TRUE 기준)
+        matched_passports_sql = text("""
+            SELECT COUNT(*) as matched_count
+            FROM passports p
+            WHERE p.user_id = :user_id 
+            AND p.is_matched = TRUE
+        """)
+        
+        matched_passports = db.execute(matched_passports_sql, {"user_id": user_id}).scalar() or 0
+        unmatched_passports = total_passports - matched_passports
+        
+        print(f"여권 통계 ({duty_free_type}): 전체 {total_passports}개, 매칭됨 {matched_passports}개, 매칭안됨 {unmatched_passports}개")
+        
+        return {
+            "total_passports": total_passports,
+            "matched_passports": matched_passports,
+            "unmatched_passports": unmatched_passports
+        }
+        
+    except Exception as e:
+        print(f"여권 통계 계산 중 오류: {str(e)}")
+        return {
+            "total_passports": 0,
+            "matched_passports": 0,
+            "unmatched_passports": 0
+        }
 
 @app.get("/")
 def main_page(request: Request, db: Session = Depends(get_db)):
@@ -583,6 +663,15 @@ async def result(
         # 6) 조회용 리스트 생성 (duty_free_type 매개변수 추가)
         matched, unmatched = fetch_results(current_user.id, duty_free_type)
         
+        # 여권 정보 조회
+        passport_info = matching_passport(current_user.id, duty_free_type)
+        
+        # 영수증과 여권이 모두 매칭된 고객 수 계산
+        fully_matched_customers = calculate_fully_matched_customers(current_user.id, duty_free_type, db)
+        
+        # 여권 통계 계산
+        passport_stats = calculate_passport_statistics(current_user.id, duty_free_type, db)
+        
         # 7) 임시 디렉터리 삭제
         shutil.rmtree(tmp)
 
@@ -596,8 +685,10 @@ async def result(
             "result.html",
             {
                 "request": request,
-                "results": matched,
+                "results": passport_info,
                 "unmatched_receipts": unmatched,
+                "fully_matched_customers": fully_matched_customers,
+                "passport_stats": passport_stats,
                 "user": current_user,
                 "duty_free_type": duty_free_type
             }
@@ -614,6 +705,8 @@ async def result(
                 "error": f"처리 중 오류가 발생했습니다: {str(e)}",
                 "results": [],
                 "unmatched_receipts": [],
+                "fully_matched_customers": 0,
+                "passport_stats": {"total_passports": 0, "matched_passports": 0, "unmatched_passports": 0},
                 "user": current_user,
                 "duty_free_type": duty_free_type if 'duty_free_type' in locals() else 'lotte'
             }
@@ -663,12 +756,20 @@ async def get_result(
         # 여권 정보 조회
         passport_info = matching_passport(current_user.id, duty_free_type)
         
+        # 영수증과 여권이 모두 매칭된 고객 수 계산
+        fully_matched_customers = calculate_fully_matched_customers(current_user.id, duty_free_type, db)
+        
+        # 여권 통계 계산
+        passport_stats = calculate_passport_statistics(current_user.id, duty_free_type, db)
+        
         return templates.TemplateResponse(
             "result.html",
             {
                 "request": request,
                 "results": passport_info,
                 "unmatched_receipts": unmatched,
+                "fully_matched_customers": fully_matched_customers,
+                "passport_stats": passport_stats,
                 "user": current_user,
                 "duty_free_type": duty_free_type
             }
@@ -682,6 +783,8 @@ async def get_result(
                 "error": f"결과 조회 중 오류가 발생했습니다: {str(e)}",
                 "results": [],
                 "unmatched_receipts": [],
+                "fully_matched_customers": 0,
+                "passport_stats": {"total_passports": 0, "matched_passports": 0, "unmatched_passports": 0},
                 "user": current_user,
                 "duty_free_type": "lotte"
             }
@@ -949,7 +1052,35 @@ async def update_unmatched(
                 db.add(new_match_log)
                     
             db.commit()
-            return RedirectResponse(url="/result/", status_code=303)
+            
+            # 매칭 성공 여부 확인
+            is_matched = result is not None
+            
+            # 다음 매칭되지 않은 영수증 찾기
+            unmatched_sql = text("""
+                SELECT r.id, r.receipt_number, r.file_path
+                FROM receipts r
+                JOIN receipt_match_log rml ON r.receipt_number = rml.receipt_number
+                WHERE rml.is_matched = FALSE 
+                AND r.user_id = :user_id 
+                AND rml.user_id = :user_id
+                AND r.id > :current_id
+                ORDER BY r.id
+                LIMIT 1
+            """)
+            next_receipt = db.execute(unmatched_sql, {"user_id": current_user.id, "current_id": receipt_id}).fetchone()
+            
+            # JSON 응답으로 결과 반환
+            return {
+                "success": True,
+                "matched": is_matched,
+                "message": "매칭 성공" if is_matched else "매칭 실패 - 엑셀 데이터에서 해당 영수증 번호를 찾을 수 없습니다",
+                "next_receipt": {
+                    "id": next_receipt.id,
+                    "receipt_number": next_receipt.receipt_number
+                } if next_receipt else None,
+                "has_more": next_receipt is not None
+            }
         
         # 신라 영수증 처리
         shilla_receipt = db.query(ShillaReceipt).filter(
@@ -1123,7 +1254,33 @@ async def update_unmatched(
         print(f"  - 여권번호: {old_passport_number} -> {passport_number}")
         print(f"  - 엑셀 매칭: {'성공' if excel_result else '실패'}")
         
-        return RedirectResponse(url="/result/", status_code=303)
+        # 매칭 성공 여부 확인
+        is_matched = excel_result is not None
+        
+        # 다음 매칭되지 않은 신라 영수증 찾기
+        next_unmatched_sql = text("""
+            SELECT sr.id, sr.receipt_number, sr.file_path
+            FROM shilla_receipts sr
+            LEFT JOIN shilla_excel_data se ON sr.receipt_number = se."receiptNumber"::text
+            WHERE sr.user_id = :user_id
+            AND se."receiptNumber" IS NULL
+            AND sr.id > :current_id
+            ORDER BY sr.id
+            LIMIT 1
+        """)
+        next_receipt = db.execute(next_unmatched_sql, {"user_id": current_user.id, "current_id": receipt_id}).fetchone()
+        
+        # JSON 응답으로 결과 반환
+        return {
+            "success": True,
+            "matched": is_matched,
+            "message": "매칭 성공" if is_matched else "매칭 실패 - 엑셀 데이터에서 해당 영수증 번호를 찾을 수 없습니다",
+            "next_receipt": {
+                "id": next_receipt.id,
+                "receipt_number": next_receipt.receipt_number
+            } if next_receipt else None,
+            "has_more": next_receipt is not None
+        }
         
     except Exception as e:
         db.rollback()
@@ -1140,43 +1297,34 @@ async def edit_passport(
     ):
     with SessionLocal() as db:
         try:
-            # 여권 정보 조회 - 조건을 단순화
-            sql = text("""
-                SELECT p.name as passport_name, p.passport_number, p.birthday, p.file_path
-                FROM passports p
-                WHERE p.name = :name AND p.user_id = :user_id
-            """)
-            result = db.execute(sql, {"name": name, "user_id": current_user.id}).first()
+            # 실제 데이터베이스에서 여권 객체 조회
+            passport = db.query(Passport).filter(
+                Passport.name == name,
+                Passport.user_id == current_user.id
+            ).first()
             
             # 만약 정확한 이름으로 찾지 못했다면, 유사한 이름으로 검색
-            if not result:
-                sql = text("""
-                    SELECT p.name as passport_name, p.passport_number, p.birthday, p.file_path
-                    FROM passports p
-                    WHERE p.user_id = :user_id
-                    ORDER BY p.id DESC
-                    LIMIT 1
-                """)
-                result = db.execute(sql, {"user_id": current_user.id}).first()
+            if not passport:
+                passport = db.query(Passport).filter(
+                    Passport.user_id == current_user.id
+                ).order_by(Passport.id.desc()).first()
             
-            if not result:
-                # 여권 정보가 없는 경우 기본값으로 새 객체 생성
+            if not passport:
+                # 여권 정보가 없는 경우 새로 생성하고 저장
                 passport = Passport(
+                    user_id=current_user.id,
                     name=name,
                     passport_number="",
                     birthday=None,
-                    file_path=""
+                    file_path="",
+                    is_matched=False
                 )
-                print(f"여권 정보를 찾을 수 없음. 기본값으로 생성: {name}")
+                db.add(passport)
+                db.commit()
+                db.refresh(passport)  # ID를 포함한 전체 정보 새로고침
+                print(f"여권 정보를 찾을 수 없어서 새로 생성: {name}, ID: {passport.id}")
             else:
-                # Passport 객체 생성
-                passport = Passport(
-                    name=result[0],  # passport_name
-                    passport_number=result[1],  # passport_number
-                    birthday=result[2],  # birthday
-                    file_path=result[3]  # file_path
-                )
-                print(f"여권 정보 찾음: {passport.name}")
+                print(f"여권 정보 찾음: {passport.name}, ID: {passport.id}")
             
             return templates.TemplateResponse(
                 "edit_passport.html",
@@ -1189,13 +1337,31 @@ async def edit_passport(
             )
         except Exception as e:
             print(f"edit_passport 오류: {str(e)}")
-            # 오류 발생 시에도 기본값으로 처리
-            passport = Passport(
-                name=name,
-                passport_number="",
-                birthday=None,
-                file_path=""
-            )
+            # 오류 발생 시에도 기본값으로 처리하되, 실제 DB에 저장
+            try:
+                passport = Passport(
+                    user_id=current_user.id,
+                    name=name,
+                    passport_number="",
+                    birthday=None,
+                    file_path="",
+                    is_matched=False
+                )
+                db.add(passport)
+                db.commit()
+                db.refresh(passport)
+            except:
+                # DB 저장도 실패한 경우 임시 객체 생성
+                passport = Passport(
+                    id=0,  # 임시 ID
+                    user_id=current_user.id,
+                    name=name,
+                    passport_number="",
+                    birthday=None,
+                    file_path="",
+                    is_matched=False
+                )
+            
             return templates.TemplateResponse(
                 "edit_passport.html",
                 {
@@ -1205,6 +1371,155 @@ async def edit_passport(
                     "user": current_user,
                     "error": f"여권 정보를 불러오는 중 오류가 발생했습니다: {str(e)}"
                 }
+            )
+
+@app.get("/edit_passport_by_id/{passport_id}")
+async def edit_passport_by_id(
+    request: Request,
+    passport_id: int,
+    current_user: User = Depends(get_current_user)
+    ):
+    with SessionLocal() as db:
+        try:
+            # ID로 직접 여권 객체 조회
+            passport = db.query(Passport).filter(
+                Passport.id == passport_id,
+                Passport.user_id == current_user.id
+            ).first()
+            
+            if not passport:
+                raise HTTPException(status_code=404, detail="여권 정보를 찾을 수 없습니다.")
+            
+            print(f"ID로 여권 정보 찾음: {passport.name}, ID: {passport.id}")
+            
+            return templates.TemplateResponse(
+                "edit_passport.html",
+                {
+                    "request": request,
+                    "passport": passport,
+                    "name": passport.name or "unknown",
+                    "user": current_user
+                }
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"edit_passport_by_id 오류: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"여권 정보를 불러오는 중 오류가 발생했습니다: {str(e)}")
+
+@app.post("/update_passport_by_id/{passport_id}")
+async def update_passport_by_id(
+    request: Request,
+    passport_id: int,
+    new_name: str = Form(...),
+    passport_number: str = Form(None),
+    birthday: str = Form(None),
+    current_user: User = Depends(get_current_user)
+):
+    with SessionLocal() as db:
+        try:
+            # ID로 기존 여권 정보 조회
+            passport = db.query(Passport).filter(
+                Passport.id == passport_id,
+                Passport.user_id == current_user.id
+            ).first()
+            
+            if not passport:
+                raise HTTPException(status_code=404, detail="여권 정보를 찾을 수 없습니다.")
+            
+            old_name = passport.name
+            
+            # 여권 정보 업데이트
+            passport.name = new_name
+            if passport_number:
+                passport.passport_number = passport_number
+            if birthday:
+                try:
+                    passport.birthday = datetime.strptime(birthday, '%Y-%m-%d').date()
+                except ValueError:
+                    print(f"잘못된 날짜 형식: {birthday}")
+            
+            # 모든 면세점 타입에서 검색 (동적 테이블 조회)
+            excel_result = None
+            try:
+                # 롯데 데이터에서 검색
+                lotte_sql = text("""
+                    SELECT "receiptNumber", name, "PayBack" 
+                    FROM lotte_excel_data 
+                    WHERE name = :name
+                """)
+                excel_result = db.execute(lotte_sql, {"name": new_name}).first()
+                
+                if not excel_result:
+                    # 신라 데이터에서 검색
+                    shilla_sql = text("""
+                        SELECT "receiptNumber", name, "PayBack" 
+                        FROM shilla_excel_data 
+                        WHERE name = :name
+                    """)
+                    excel_result = db.execute(shilla_sql, {"name": new_name}).first()
+            except Exception as e:
+                print(f"엑셀 데이터 검색 오류: {e}")
+                
+            # 매칭 로그 업데이트
+            if excel_result:
+                # 매칭된 경우 receipt_match_log 업데이트
+                match_log = db.query(ReceiptMatchLog).filter(
+                    ReceiptMatchLog.receipt_number == excel_result[0],
+                    ReceiptMatchLog.user_id == current_user.id
+                ).first()
+                
+                if match_log:
+                    match_log.is_matched = True
+                    match_log.excel_name = excel_result[1]
+                    match_log.passport_number = passport_number
+                    match_log.birthday = passport.birthday
+                
+                # 여권 매칭 상태 업데이트
+                passport.is_matched = True
+                print(f"여권 매칭 성공: {new_name} -> {excel_result[0]}")
+            else:
+                # 매칭되지 않은 경우
+                passport.is_matched = False
+                print(f"여권 매칭 실패: {new_name}")
+            
+            db.commit()
+            print(f"여권 정보 업데이트 완료: {old_name} (ID: {passport_id}) -> {new_name}")
+            
+            # 다음 매칭되지 않은 여권 찾기 (ID 기반)
+            unmatched_passports = get_unmatched_passports(current_user.id)
+            
+            # 현재 여권의 다음 여권 찾기 (ID 기반으로 비교)
+            next_passport = None
+            current_found = False
+            for passport_item in unmatched_passports:
+                if current_found:
+                    next_passport = passport_item
+                    break
+                if passport_item.get('id') == passport_id:
+                    current_found = True
+            
+            # 다음 여권이 있으면 해당 여권 편집 페이지로, 없으면 목록 페이지로
+            if next_passport:
+                return RedirectResponse(
+                    url=f"/edit_passport_by_id/{next_passport['id']}",
+                    status_code=303
+                )
+            else:
+                return RedirectResponse(
+                    url="/unmatched-passports/",
+                    status_code=303
+                )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            db.rollback()
+            print(f"update_passport_by_id 오류: {str(e)}")
+            # 오류 발생 시 현재 페이지로 다시 리다이렉트
+            return RedirectResponse(
+                url=f"/edit_passport_by_id/{passport_id}?error={str(e)}",
+                status_code=303
             )
 
 @app.post("/update_passport/{name}")
@@ -1294,10 +1609,30 @@ async def update_passport(
             db.commit()
             print(f"여권 정보 업데이트 완료: {name} -> {new_name}")
             
-            return RedirectResponse(
-                url="/unmatched-passports/",
-                status_code=303
-            )
+            # 다음 매칭되지 않은 여권 찾기
+            unmatched_passports = get_unmatched_passports(current_user.id)
+            
+            # 현재 여권의 다음 여권 찾기
+            next_passport = None
+            current_found = False
+            for passport_item in unmatched_passports:
+                if current_found:
+                    next_passport = passport_item
+                    break
+                if passport_item.name == name:
+                    current_found = True
+            
+            # 다음 여권이 있으면 해당 여권 편집 페이지로, 없으면 목록 페이지로
+            if next_passport:
+                return RedirectResponse(
+                    url=f"/edit_passport/{next_passport.name}",
+                    status_code=303
+                )
+            else:
+                return RedirectResponse(
+                    url="/unmatched-passports/",
+                    status_code=303
+                )
             
         except Exception as e:
             db.rollback()
@@ -1570,14 +1905,30 @@ async def complete_session(
         # 3. 현재 데이터를 ProcessingHistory 테이블로 이동 (개별 처리로 변경)
         print("이력 저장 시작...")
         
+        # 모든 레코드에 대해 동일한 upload_id 사용
+        common_upload_id = None
+        for record in current_data:
+            if record.upload_id:
+                common_upload_id = record.upload_id
+                break
+        
+        # 공통 upload_id가 없으면 새로 생성 (한 번만)
+        if not common_upload_id:
+            common_upload_id = f"legacy_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        print(f"사용할 upload_id: {common_upload_id}")
+        
         saved_count = 0
         for i, record in enumerate(current_data):
             try:
                 print(f"레코드 {i+1}/{len(current_data)} 처리 중: {record.receipt_number}")
                 
+                # 모든 레코드에 동일한 upload_id 사용
+                upload_id = common_upload_id
+                
                 history_record = ProcessingHistory(
                     user_id=record.user_id,
-                    upload_id=record.upload_id or f"legacy_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    upload_id=upload_id,
                     session_name=final_session_name,
                     receipt_number=record.receipt_number,
                     is_matched=record.is_matched,
@@ -1678,20 +2029,39 @@ async def processing_history(
 ):
     """처리 이력 조회 페이지"""
     try:
-        # ProcessingHistory에서 세션별 요약 정보 조회
+        # ProcessingHistory에서 세션별 요약 정보 조회 (duty_free_type 그룹핑 제거)
         history_summary = db.execute(text("""
+            WITH session_duty_free AS (
+                SELECT 
+                    upload_id,
+                    session_name,
+                    user_id,
+                    duty_free_type,
+                    COUNT(*) as type_count,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY upload_id, session_name, user_id 
+                        ORDER BY COUNT(*) DESC, duty_free_type DESC
+                    ) as rn
+                FROM processing_history 
+                WHERE user_id = :user_id
+                GROUP BY upload_id, session_name, user_id, duty_free_type
+            )
             SELECT 
-                upload_id,
-                session_name,
-                duty_free_type,
-                MIN(archived_at) as session_date,
+                p.upload_id,
+                p.session_name,
+                sdf.duty_free_type,
+                MIN(p.archived_at) as session_date,
                 COUNT(*) as total_records,
-                COUNT(CASE WHEN is_matched = true THEN 1 END) as matched_records,
-                SUM(CASE WHEN commission_fee IS NOT NULL THEN commission_fee ELSE 0 END) as total_commission
-            FROM processing_history 
-            WHERE user_id = :user_id 
-            GROUP BY upload_id, session_name, duty_free_type
-            ORDER BY MIN(archived_at) DESC
+                COUNT(CASE WHEN p.is_matched = true THEN 1 END) as matched_records,
+                SUM(CASE WHEN p.commission_fee IS NOT NULL THEN p.commission_fee ELSE 0 END) as total_commission
+            FROM processing_history p
+            JOIN session_duty_free sdf ON p.upload_id = sdf.upload_id 
+                AND p.session_name = sdf.session_name 
+                AND p.user_id = sdf.user_id 
+                AND sdf.rn = 1
+            WHERE p.user_id = :user_id 
+            GROUP BY p.upload_id, p.session_name, sdf.duty_free_type
+            ORDER BY MIN(p.archived_at) DESC
         """), {"user_id": current_user.id}).fetchall()
         
         # 결과를 딕셔너리로 변환
@@ -2116,3 +2486,466 @@ async def download_customer_receipt(
     except Exception as e:
         print(f"고객 수령증 다운로드 오류: {e}")
         raise HTTPException(status_code=500, detail=f"수령증 다운로드 중 오류가 발생했습니다: {str(e)}")
+
+@app.get("/api/next-unmatched-passport-by-id/")
+async def get_next_unmatched_passport_by_id(
+    current_id: int = 0,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """ID 기반으로 다음 매칭되지 않은 여권 조회"""
+    try:
+        unmatched_passports = get_unmatched_passports(current_user.id)
+        
+        if not unmatched_passports:
+            return {
+                "success": True,
+                "has_more": False,
+                "next_passport": None,
+                "message": "매칭되지 않은 여권이 없습니다."
+            }
+        
+        # 현재 여권의 다음 여권 찾기
+        next_passport = None
+        current_found = False
+        
+        for passport_item in unmatched_passports:
+            if current_found:
+                next_passport = passport_item
+                break
+            if passport_item.get('id') == current_id:
+                current_found = True
+        
+        if next_passport:
+            return {
+                "success": True,
+                "has_more": True,
+                "next_passport": {
+                    "id": next_passport['id'],
+                    "name": next_passport['passport_name']
+                },
+                "message": f"다음 여권: {next_passport['passport_name']}"
+            }
+        else:
+            return {
+                "success": True,
+                "has_more": False,
+                "next_passport": None,
+                "message": "더 이상 처리할 여권이 없습니다."
+            }
+            
+    except Exception as e:
+        print(f"다음 여권 조회 오류: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "has_more": False,
+            "next_passport": None
+        }
+
+@app.get("/api/next-unmatched-passport/")
+async def get_next_unmatched_passport(
+    current_name: str = "",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """현재 여권 다음의 매칭되지 않은 여권을 반환"""
+    try:
+        unmatched_passports = get_unmatched_passports(current_user.id)
+        
+        if not unmatched_passports:
+            return {"next_passport": None, "has_more": False}
+        
+        # 현재 여권의 인덱스 찾기
+        current_index = -1
+        for i, passport in enumerate(unmatched_passports):
+            passport_name = passport.get("passport_name") if isinstance(passport, dict) else passport.name
+            if passport_name == current_name:
+                current_index = i
+                break
+        
+        # 다음 여권 찾기
+        next_index = current_index + 1
+        if next_index < len(unmatched_passports):
+            next_passport = unmatched_passports[next_index]
+            
+            # 딕셔너리인지 객체인지 확인
+            if isinstance(next_passport, dict):
+                return {
+                    "next_passport": {
+                        "name": next_passport.get("passport_name"),
+                        "passport_number": next_passport.get("passport_number"),
+                        "birthday": next_passport.get("birthday").strftime('%Y-%m-%d') if next_passport.get("birthday") else None,
+                        "file_path": next_passport.get("file_path")
+                    },
+                    "has_more": True,
+                    "remaining_count": len(unmatched_passports) - next_index
+                }
+            else:
+                return {
+                    "next_passport": {
+                        "name": next_passport.name,
+                        "passport_number": next_passport.passport_number,
+                        "birthday": next_passport.birthday.strftime('%Y-%m-%d') if next_passport.birthday else None,
+                        "file_path": next_passport.file_path
+                    },
+                    "has_more": True,
+                    "remaining_count": len(unmatched_passports) - next_index
+                }
+        else:
+            return {"next_passport": None, "has_more": False, "remaining_count": 0}
+            
+    except Exception as e:
+        print(f"다음 매칭되지 않은 여권 조회 오류: {str(e)}")
+        return {"error": str(e), "next_passport": None, "has_more": False}
+
+@app.get("/api/next-unmatched-receipt/")
+async def get_next_unmatched_receipt(
+    current_id: int = 0,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """현재 영수증 다음의 매칭되지 않은 영수증을 반환"""
+    try:
+        # 사용자의 면세점 타입 확인
+        duty_free_type = "lotte"  # 기본값
+        
+        # 신라 데이터가 있는지 확인
+        shilla_count = db.execute(text("SELECT COUNT(*) FROM shilla_receipts WHERE user_id = :user_id"), 
+                                 {"user_id": current_user.id}).scalar()
+        if shilla_count > 0:
+            duty_free_type = "shilla"
+        
+        if duty_free_type == "shilla":
+            # 신라 면세점: 매칭되지 않은 영수증 조회
+            unmatched_sql = text("""
+                SELECT sr.id, sr.receipt_number, sr.passport_number, sr.file_path
+                FROM shilla_receipts sr
+                LEFT JOIN shilla_excel_data se ON sr.receipt_number = se."receiptNumber"::text
+                WHERE sr.user_id = :user_id
+                AND se."receiptNumber" IS NULL
+                AND sr.id > :current_id
+                ORDER BY sr.id
+                LIMIT 1
+            """)
+        else:
+            # 롯데 면세점: 매칭되지 않은 영수증 조회
+            unmatched_sql = text("""
+                SELECT r.id, r.receipt_number, NULL as passport_number, r.file_path
+                FROM receipts r
+                JOIN receipt_match_log rml ON r.receipt_number = rml.receipt_number
+                WHERE rml.is_matched = FALSE 
+                AND r.user_id = :user_id 
+                AND rml.user_id = :user_id
+                AND r.id > :current_id
+                ORDER BY r.id
+                LIMIT 1
+            """)
+        
+        result = db.execute(unmatched_sql, {"user_id": current_user.id, "current_id": current_id}).fetchone()
+        
+        if result:
+            return {
+                "next_receipt": {
+                    "id": result.id,
+                    "receipt_number": result.receipt_number,
+                    "passport_number": result.passport_number,
+                    "file_path": result.file_path,
+                    "duty_free_type": duty_free_type
+                },
+                "has_more": True
+            }
+        else:
+            return {"next_receipt": None, "has_more": False}
+            
+    except Exception as e:
+        print(f"다음 매칭되지 않은 영수증 조회 오류: {str(e)}")
+        return {"error": str(e)}, 500
+
+@app.get("/api/unmatched-receipts/")
+async def get_unmatched_receipts(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """매칭되지 않은 영수증 전체 목록을 반환"""
+    try:
+        # 사용자의 면세점 타입 확인
+        duty_free_type = "lotte"  # 기본값
+        
+        # 신라 데이터가 있는지 확인
+        shilla_count = db.execute(text("SELECT COUNT(*) FROM shilla_receipts WHERE user_id = :user_id"), 
+                                 {"user_id": current_user.id}).scalar()
+        if shilla_count > 0:
+            duty_free_type = "shilla"
+        
+        unmatched_receipts = []
+        
+        if duty_free_type == "shilla":
+            # 신라 면세점: 매칭되지 않은 영수증 조회
+            unmatched_sql = text("""
+                SELECT sr.id, sr.receipt_number, sr.passport_number, sr.file_path
+                FROM shilla_receipts sr
+                LEFT JOIN shilla_excel_data se ON sr.receipt_number = se."receiptNumber"::text
+                WHERE sr.user_id = :user_id
+                AND se."receiptNumber" IS NULL
+                ORDER BY sr.id
+            """)
+        else:
+            # 롯데 면세점: 매칭되지 않은 영수증 조회 (receipt_number가 None인 경우도 포함)
+            unmatched_sql = text("""
+                SELECT r.id, r.receipt_number, NULL as passport_number, r.file_path
+                FROM receipts r
+                LEFT JOIN receipt_match_log rml ON r.receipt_number = rml.receipt_number AND rml.user_id = r.user_id
+                WHERE r.user_id = :user_id
+                AND (
+                    r.receipt_number IS NULL OR
+                    (rml.is_matched = FALSE AND rml.user_id = :user_id)
+                )
+                ORDER BY r.id
+            """)
+        
+        results = db.execute(unmatched_sql, {"user_id": current_user.id}).fetchall()
+        
+        for result in results:
+            unmatched_receipts.append({
+                "id": result.id,
+                "receipt_number": result.receipt_number,
+                "passport_number": result.passport_number,
+                "file_path": result.file_path
+            })
+        
+        return {
+            "receipts": unmatched_receipts,
+            "duty_free_type": duty_free_type,
+            "total_count": len(unmatched_receipts)
+        }
+            
+    except Exception as e:
+        print(f"매칭되지 않은 영수증 목록 조회 오류: {str(e)}")
+        return {"error": str(e)}, 500
+
+@app.post("/api/change-type/")
+async def change_item_type(
+    item_id: int = Form(...),
+    current_type: str = Form(...),  # "receipt", "passport", "unrecognized"
+    new_type: str = Form(...),  # "receipt", "passport", "delete"
+    passport_name: str = Form(None),  # 여권의 경우 이름도 함께 전달
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """항목의 유형을 변경합니다 (영수증 ↔ 여권 ↔ 삭제)"""
+    try:
+        # 현재 항목 조회
+        current_item = None
+        if current_type == "receipt":
+            # 롯데 영수증 확인
+            current_item = db.query(Receipt).filter(
+                Receipt.id == item_id,
+                Receipt.user_id == current_user.id
+            ).first()
+            
+            # 신라 영수증 확인
+            if not current_item:
+                current_item = db.query(ShillaReceipt).filter(
+                    ShillaReceipt.id == item_id,
+                    ShillaReceipt.user_id == current_user.id
+                ).first()
+                current_type = "shilla_receipt"
+                
+        elif current_type == "passport":
+            # 먼저 ID로 검색
+            current_item = db.query(Passport).filter(
+                Passport.id == item_id,
+                Passport.user_id == current_user.id
+            ).first()
+            
+            # ID로 찾지 못했다면 이름으로 검색
+            if not current_item and passport_name:
+                current_item = db.query(Passport).filter(
+                    Passport.name == passport_name,
+                    Passport.user_id == current_user.id
+                ).first()
+            
+        elif current_type == "unrecognized":
+            current_item = db.query(UnrecognizedImage).filter(
+                UnrecognizedImage.id == item_id,
+                UnrecognizedImage.user_id == current_user.id
+            ).first()
+        
+        if not current_item:
+            return JSONResponse(content={"success": False, "message": "항목을 찾을 수 없습니다."}, status_code=404)
+        
+        file_path = current_item.file_path
+        upload_id = getattr(current_item, 'upload_id', None)
+        
+        # 삭제 처리
+        if new_type == "delete":
+            db.delete(current_item)
+            
+            # 관련 매칭 로그도 삭제 (영수증인 경우)
+            if current_type in ["receipt", "shilla_receipt"]:
+                if hasattr(current_item, 'receipt_number') and current_item.receipt_number:
+                    db.query(ReceiptMatchLog).filter(
+                        ReceiptMatchLog.receipt_number == current_item.receipt_number,
+                        ReceiptMatchLog.user_id == current_user.id
+                    ).delete()
+            
+            db.commit()
+            return JSONResponse(content={"success": True, "message": "항목이 삭제되었습니다."})
+        
+        # 타입 변경 처리
+        if new_type == "receipt":
+            # 면세점 타입 확인
+            duty_free_type = "lotte"  # 기본값
+            shilla_count = db.execute(text("SELECT COUNT(*) FROM shilla_receipts WHERE user_id = :user_id"), 
+                                     {"user_id": current_user.id}).scalar()
+            if shilla_count > 0:
+                duty_free_type = "shilla"
+            
+            if duty_free_type == "shilla":
+                new_item = ShillaReceipt(
+                    user_id=current_user.id,
+                    upload_id=upload_id,
+                    file_path=file_path,
+                    receipt_number=None,
+                    passport_number=None
+                )
+            else:
+                new_item = Receipt(
+                    user_id=current_user.id,
+                    upload_id=upload_id,
+                    file_path=file_path,
+                    receipt_number=None
+                )
+            
+            db.add(new_item)
+            
+            # 롯데 면세점의 경우, receipt_number가 None인 영수증은 자동으로 매칭되지 않은 것으로 처리됨
+            # (매칭 로그는 영수증 번호가 입력될 때 생성됨)
+            
+        elif new_type == "passport":
+            new_item = Passport(
+                user_id=current_user.id,
+                upload_id=upload_id,
+                file_path=file_path,
+                passport_number=None,
+                birthday=None,
+                name=None,
+                is_matched=False
+            )
+            db.add(new_item)
+            
+        elif new_type == "unrecognized":
+            new_item = UnrecognizedImage(
+                user_id=current_user.id,
+                upload_id=upload_id,
+                file_path=file_path
+            )
+            db.add(new_item)
+        
+        # 기존 항목 삭제
+        db.delete(current_item)
+        
+        # 관련 매칭 로그 정리 (영수증인 경우)
+        if current_type in ["receipt", "shilla_receipt"]:
+            if hasattr(current_item, 'receipt_number') and current_item.receipt_number:
+                db.query(ReceiptMatchLog).filter(
+                    ReceiptMatchLog.receipt_number == current_item.receipt_number,
+                    ReceiptMatchLog.user_id == current_user.id
+                ).delete()
+        
+        db.commit()
+        
+        type_names = {
+            "receipt": "영수증",
+            "passport": "여권", 
+            "unrecognized": "인식안된 이미지"
+        }
+        
+        return JSONResponse(content={
+            "success": True, 
+            "message": f"항목이 {type_names.get(new_type, new_type)}(으)로 변경되었습니다.",
+            "new_id": new_item.id if new_type != "delete" else None
+        })
+        
+    except Exception as e:
+        db.rollback()
+        print(f"유형 변경 오류: {str(e)}")
+        return JSONResponse(content={"success": False, "message": f"유형 변경 중 오류가 발생했습니다: {str(e)}"}, status_code=500)
+
+@app.get("/api/unrecognized-images/")
+async def get_unrecognized_images(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """인식되지 않은 이미지 목록을 반환"""
+    try:
+        unrecognized_images = db.query(UnrecognizedImage).filter(
+            UnrecognizedImage.user_id == current_user.id
+        ).order_by(UnrecognizedImage.created_at.desc()).all()
+        
+        images = []
+        for img in unrecognized_images:
+            images.append({
+                "id": img.id,
+                "file_path": img.file_path,
+                "created_at": img.created_at.isoformat() if img.created_at else None
+            })
+        
+        return {
+            "images": images,
+            "total_count": len(images)
+        }
+        
+    except Exception as e:
+        print(f"인식되지 않은 이미지 조회 오류: {str(e)}")
+        return {"error": str(e)}
+
+@app.post("/api/delete-all-unrecognized/")
+async def delete_all_unrecognized_images(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """모든 인식되지 않은 이미지를 삭제합니다"""
+    try:
+        # 현재 사용자의 인식되지 않은 이미지 조회
+        unrecognized_images = db.query(UnrecognizedImage).filter(
+            UnrecognizedImage.user_id == current_user.id
+        ).all()
+        
+        deleted_count = len(unrecognized_images)
+        
+        if deleted_count == 0:
+            return {"success": True, "deleted_count": 0, "message": "삭제할 이미지가 없습니다."}
+        
+        # 모든 이미지 삭제
+        db.query(UnrecognizedImage).filter(
+            UnrecognizedImage.user_id == current_user.id
+        ).delete()
+        
+        db.commit()
+        
+        return {
+            "success": True, 
+            "deleted_count": deleted_count,
+            "message": f"{deleted_count}개의 인식되지 않은 이미지가 삭제되었습니다."
+        }
+        
+    except Exception as e:
+        db.rollback()
+        print(f"전체 삭제 오류: {str(e)}")
+        return {"success": False, "message": f"전체 삭제 중 오류가 발생했습니다: {str(e)}"}
+
+@app.get("/unrecognized-images/")
+async def unrecognized_images_page(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    """인식되지 않은 이미지 관리 페이지"""
+    return templates.TemplateResponse(
+        "unrecognized_images.html",
+        {
+            "request": request,
+            "user": current_user
+        }
+    )

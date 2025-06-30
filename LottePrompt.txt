@@ -106,4 +106,36 @@ Your task is to:
 }
 
 
+# ⚠️ Important Notice
 
+When an Image Contains a “Shopping card”
+
+It is very common for a “Shopping card” to appear together in an image with a receipt,
+and sometimes even within an image containing a passport.
+
+⚠️ Problem
+
+The issue is that the number on the Shopping card is often mistakenly recognized as a receipt number.
+
+Contents of the Shopping card:
+	•	Text: "Shopping card"
+	•	Example number: NO. 25109870
+	•	Since it is the year 2025, the number starts with 25
+	•	The number consists of 8 digits
+
+Currently, when OCR detects something like:
+
+NO. 25109870
+→ The number 25109870 is often mistakenly identified as a receipt number.
+
+Do NOT treat it as a receipt number if:
+	•	It starts with 25
+	•	It is exactly 8 digits long
+
+Let me emphasize this again:
+There are many cases where both a receipt and a Shopping card appear in the same image.
+	•	When processing such an image with OCR,
+if you see something like NO. 25xxxxxx,
+do not treat it as a receipt number. Instead, find and extract the actual receipt number.
+	•	The same applies to passport images:
+Ignore any NO. 25xxxxxx numbers found there as well.

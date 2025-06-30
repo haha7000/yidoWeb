@@ -65,10 +65,18 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="/edit_passport/{{ passport.passport_name or 'unknown' }}" 
+                                <div class="btn-group" role="group">
+                                <a href="/edit_passport_by_id/{{ passport.id }}" 
                                    class="btn btn-warning btn-sm">
                                     <i class="fas fa-edit"></i> 수정
                                 </a>
+                                    <button type="button" class="btn btn-outline-info btn-sm" 
+                                            data-passport-id="{{ passport.id }}"
+                                            data-file-path="{{ passport.file_path }}"
+                                            onclick="showChangeTypeModal(this.dataset.passportId, this.dataset.filePath)">
+                                        <i class="fas fa-exchange-alt"></i> 유형변경
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -119,11 +127,48 @@
     </div>
 </div>
 
+<!-- 유형 변경 모달 -->
+<div class="modal fade" id="changeTypeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">이미지 유형 변경</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    <img id="change-modal-image" src="" alt="선택된 이미지" style="max-width: 100%; max-height: 300px;">
+                </div>
+                <p>이 이미지가 실제로는 다른 유형이라면 올바른 유형을 선택하세요:</p>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-primary" onclick="changeItemType('receipt')">
+                        <i class="fas fa-receipt"></i> 영수증으로 분류
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="changeItemType('unrecognized')">
+                        <i class="fas fa-question-circle"></i> 인식안된 이미지로 분류
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="changeItemType('delete')">
+                        <i class="fas fa-trash"></i> 삭제
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     function showImage(imagePath) {
+        console.log('unmatched_passports.html - showImage 호출됨');
+        console.log('원본 imagePath:', imagePath);
         const modalImage = document.getElementById('modalImage');
         const filename = imagePath.split('/').pop();
-        modalImage.src = '/uploads/' + filename;
+        console.log('추출된 filename:', filename);
+        const finalSrc = '/uploads/' + filename;
+        console.log('최종 이미지 경로:', finalSrc);
+        modalImage.src = finalSrc;
         setCurrentImage('modalImage');
         resetZoom();
     }
@@ -132,5 +177,59 @@
     document.getElementById('imageModal').addEventListener('hidden.bs.modal', function () {
         resetZoom();
     });
+
+    let currentPassportId = null;
+
+    // 유형 변경 모달 표시
+    function showChangeTypeModal(passportId, imagePath) {
+        currentPassportId = passportId;
+        const filename = imagePath.split('/').pop();
+        document.getElementById('change-modal-image').src = '/uploads/' + filename;
+        
+        const modal = new bootstrap.Modal(document.getElementById('changeTypeModal'));
+        modal.show();
+    }
+
+    // 유형 변경 실행
+    async function changeItemType(newType) {
+        if (!currentPassportId) return;
+        
+        try {
+            const formData = new FormData();
+            formData.append('item_id', currentPassportId);
+            formData.append('current_type', 'passport');
+            formData.append('new_type', newType);
+            
+            const response = await fetch('/api/change-type/', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // 모달 닫기
+                const modal = bootstrap.Modal.getInstance(document.getElementById('changeTypeModal'));
+                modal.hide();
+                
+                alert(result.message);
+                
+                // 페이지 새로고침 또는 이동
+                if (newType === 'receipt') {
+                    window.location.href = `/edit_unmatched/${result.new_id}`;
+                } else if (newType === 'unrecognized') {
+                    window.location.href = '/unrecognized-images/';
+                } else if (newType === 'delete') {
+                    window.location.reload();
+                }
+            } else {
+                alert(result.message || '유형 변경 중 오류가 발생했습니다.');
+            }
+            
+        } catch (error) {
+            console.error('유형 변경 오류:', error);
+            alert('네트워크 오류가 발생했습니다.');
+        }
+    }
 </script>
 {% endblock %}

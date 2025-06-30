@@ -130,9 +130,6 @@
                             <button type="button" class="btn btn-outline-warning" onclick="skipToNext()" id="skip-btn">
                                 <i class="fas fa-forward"></i> 건너뛰고 다음으로
                             </button>
-                            <button type="button" class="btn btn-outline-info" onclick="showChangeTypeModal()">
-                                <i class="fas fa-exchange-alt"></i> 유형 변경
-                            </button>
                             <a href="/result/" class="btn btn-outline-secondary">
                                 <i class="fas fa-chart-bar"></i> 결과 페이지로
                             </a>
@@ -204,41 +201,6 @@
     </div>
 </div>
 
-<!-- 유형 변경 모달 -->
-<div class="modal fade" id="changeTypeModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">이미지 유형 변경</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="text-center mb-3">
-                    {% if receipt.file_path %}
-                    {% set filename = receipt.file_path.split('/')[-1] if '/' in receipt.file_path else receipt.file_path %}
-                    <img src="/uploads/{{ filename }}" alt="선택된 이미지" style="max-width: 100%; max-height: 300px;">
-                    {% endif %}
-                </div>
-                <p>이 이미지가 실제로는 다른 유형이라면 올바른 유형을 선택하세요:</p>
-                <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-success" onclick="changeItemType('passport')">
-                        <i class="fas fa-passport"></i> 여권으로 분류
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="changeItemType('unrecognized')">
-                        <i class="fas fa-question-circle"></i> 인식안된 이미지로 분류
-                    </button>
-                    <button type="button" class="btn btn-danger" onclick="changeItemType('delete')">
-                        <i class="fas fa-trash"></i> 삭제
-                    </button>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <style>
 .passport-option {
     border: 1px solid #dee2e6;
@@ -299,78 +261,31 @@ document.addEventListener('DOMContentLoaded', function() {
 // 매칭되지 않은 영수증 목록 로드
 async function loadUnmatchedReceipts() {
     try {
-        const response = await fetch('/api/unmatched-receipts/');
+        const response = await fetch(`/api/next-unmatched-receipt/?current_id=0`);
         const data = await response.json();
         
-        if (data.error) {
-            throw new Error(data.error);
-        }
-        
+        // 실제로는 모든 매칭되지 않은 영수증을 가져와야 하므로 별도 API 필요
+        // 임시로 현재 영수증 정보만 표시
         const tbody = document.getElementById('unmatched-list');
-        tbody.innerHTML = '';
+        tbody.innerHTML = `
+            <tr class="table-warning">
+                <td>1</td>
+                <td><code>{{ receipt.receipt_number or '없음' }}</code></td>
+                ${dutyFreeType === "shilla" ? '<td><code>{{ receipt.passport_number or "없음" }}</code></td>' : ''}
+                <td><span class="badge bg-warning text-dark">현재 편집 중</span></td>
+                <td><i class="fas fa-edit text-warning"></i></td>
+            </tr>
+        `;
         
-        if (!data.receipts || data.receipts.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="${dutyFreeType === 'shilla' ? '5' : '4'}" class="text-center p-3 text-success">
-                        <i class="fas fa-check-circle"></i> 모든 영수증이 매칭되었습니다!
-                    </td>
-                </tr>
-            `;
-            document.getElementById('total-unmatched').textContent = '0개';
-            document.getElementById('remaining-count').textContent = '남은 영수증: 0개';
-            return;
-        }
-        
-        let currentIndex = -1;
-        data.receipts.forEach((receipt, index) => {
-            if (receipt.id === currentReceiptId) {
-                currentIndex = index;
-            }
-            
-            const tr = document.createElement('tr');
-            tr.className = receipt.id === currentReceiptId ? 'table-warning' : '';
-            
-            let rowHtml = `
-                <td>${index + 1}</td>
-                <td><code>${receipt.receipt_number || '없음'}</code></td>
-            `;
-            
-            if (dutyFreeType === "shilla") {
-                rowHtml += `<td><code>${receipt.passport_number || '없음'}</code></td>`;
-            }
-            
-            rowHtml += `
-                <td>
-                    ${receipt.id === currentReceiptId ? 
-                        '<span class="badge bg-warning text-dark">현재 편집 중</span>' : 
-                        '<span class="badge bg-secondary">대기 중</span>'
-                    }
-                </td>
-                <td>
-                    ${receipt.id === currentReceiptId ? 
-                        '<i class="fas fa-edit text-warning"></i>' : 
-                        `<a href="/edit_unmatched/${receipt.id}" class="btn btn-sm btn-outline-primary">편집</a>`
-                    }
-                </td>
-            `;
-            
-            tr.innerHTML = rowHtml;
-            tbody.appendChild(tr);
-        });
-        
-        document.getElementById('total-unmatched').textContent = `${data.receipts.length}개`;
-        
-        // 남은 개수 계산
-        const remaining = Math.max(0, data.receipts.length - currentIndex - 1);
-        document.getElementById('remaining-count').textContent = `남은 영수증: ${remaining}개`;
+        document.getElementById('total-unmatched').textContent = '1개 (현재 항목)';
+        document.getElementById('remaining-count').textContent = '남은 영수증: 계산 중...';
         
     } catch (error) {
         console.error('매칭되지 않은 영수증 목록 로드 오류:', error);
         document.getElementById('unmatched-list').innerHTML = `
             <tr>
                 <td colspan="${dutyFreeType === 'shilla' ? '5' : '4'}" class="text-center p-3 text-danger">
-                    <i class="fas fa-exclamation-triangle"></i> 목록을 불러오는 중 오류가 발생했습니다: ${error.message}
+                    <i class="fas fa-exclamation-triangle"></i> 목록을 불러오는 중 오류가 발생했습니다.
                 </td>
             </tr>
         `;
@@ -384,10 +299,7 @@ async function skipToNext() {
         const data = await response.json();
         
         if (data.next_receipt) {
-            showSuccess('다음 영수증으로 이동합니다...');
-            setTimeout(() => {
-                window.location.href = `/edit_unmatched/${data.next_receipt.id}`;
-            }, 500);
+            window.location.href = `/edit_unmatched/${data.next_receipt.id}`;
         } else {
             showSuccess('모든 영수증 처리가 완료되었습니다!');
             setTimeout(() => {
@@ -539,31 +451,12 @@ function setupFormSubmission() {
             });
             
             if (response.ok) {
-                const result = await response.json();
+                showSuccess('영수증 정보가 저장되었습니다. 다음 영수증으로 이동합니다...');
                 
-                if (result.success) {
-                    if (result.matched) {
-                        // 매칭 성공 - 다음 영수증으로 이동
-                        showSuccess(`매칭 성공! ${result.message}`);
-                        
-                        if (result.has_more && result.next_receipt) {
-                            setTimeout(() => {
-                                window.location.href = `/edit_unmatched/${result.next_receipt.id}`;
-                            }, 1000);
-                        } else {
-                            setTimeout(() => {
-                                window.location.href = '/result/';
-                            }, 2000);
-                        }
-                    } else {
-                        // 매칭 실패 - 같은 페이지에 머물면서 오류 메시지 표시
-                        showError(`매칭 실패: ${result.message}`);
-                        receiptInput.classList.add('input-error');
-                    }
-                } else {
-                    showError('저장 중 오류가 발생했습니다.');
-                    receiptInput.classList.add('input-error');
-                }
+                // 1초 후 자동 리다이렉트 (서버에서 이미 처리됨)
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
             } else {
                 // 오류 처리
                 const contentType = response.headers.get('Content-Type');
@@ -633,58 +526,6 @@ function clearSuccess() {
     if (successDiv) {
         successDiv.style.display = 'none';
         successDiv.textContent = '';
-    }
-}
-
-// 유형 변경 모달 표시
-function showChangeTypeModal() {
-    const modal = new bootstrap.Modal(document.getElementById('changeTypeModal'));
-    modal.show();
-}
-
-// 유형 변경 실행
-async function changeItemType(newType) {
-    try {
-        const formData = new FormData();
-        formData.append('item_id', currentReceiptId);
-        formData.append('current_type', 'receipt');
-        formData.append('new_type', newType);
-        
-        const response = await fetch('/api/change-type/', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            // 모달 닫기
-            const modal = bootstrap.Modal.getInstance(document.getElementById('changeTypeModal'));
-            modal.hide();
-            
-            showSuccess(result.message);
-            
-            // 페이지 이동 또는 새로고침
-            if (newType === 'passport') {
-                setTimeout(() => {
-                    window.location.href = `/edit_passport/${result.new_id}`;
-                }, 1000);
-            } else if (newType === 'unrecognized') {
-                setTimeout(() => {
-                    window.location.href = '/unrecognized-images/';
-                }, 1000);
-            } else if (newType === 'delete') {
-                setTimeout(() => {
-                    window.location.href = '/result/';
-                }, 1000);
-            }
-        } else {
-            showError(result.message || '유형 변경 중 오류가 발생했습니다.');
-        }
-        
-    } catch (error) {
-        console.error('유형 변경 오류:', error);
-        showError('네트워크 오류가 발생했습니다.');
     }
 }
 </script>

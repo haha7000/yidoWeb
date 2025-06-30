@@ -223,3 +223,91 @@ class ProcessingHistory(Base):
     archived_at = Column(TIMESTAMP, server_default=func.now())  # 아카이브 시각
     
     user = relationship("User", back_populates="processing_histories")
+
+# === 수수료 관리 모델들 ===
+
+class FeeSettings(Base):
+    """수수료 설정 기본 정보"""
+    __tablename__ = "fee_settings"
+    
+    id = Column(Integer, primary_key=True)
+    company_name = Column(String(50), nullable=False)  # 면세점명 (LOTTE, SHILLA)
+    branch_name = Column(String(100), nullable=False)  # 지점명
+    note = Column(Text, nullable=True)  # 메모
+    free_rate_threshold = Column(DECIMAL(5,2), nullable=True)  # 수수료 제외 할인율 임계값
+    effective_from = Column(Date, nullable=False)  # 시작일
+    effective_to = Column(Date, nullable=False)  # 종료일
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, nullable=True)
+    updater_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
+    # 관계 설정
+    creator = relationship("User", foreign_keys=[creator_id])
+    updater = relationship("User", foreign_keys=[updater_id])
+    category_fees = relationship("CategoryFees", back_populates="settings")
+    brand_fees = relationship("BrandFees", back_populates="settings")
+    item_fees = relationship("ItemFees", back_populates="settings")
+    exempt_brands = relationship("ExemptBrands", back_populates="settings")
+
+class CategoryFees(Base):
+    """카테고리별 수수료 (7개 고정 구분)"""
+    __tablename__ = "category_fees"
+    
+    id = Column(Integer, primary_key=True)
+    settings_id = Column(Integer, ForeignKey("fee_settings.id", ondelete="CASCADE"), nullable=False)
+    fee_type = Column(String(20), nullable=False)  # 7개 고정 구분
+    commission_rate = Column(DECIMAL(5,4), nullable=False)  # 수수료율
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    creator_id = Column(Integer, nullable=False)
+    
+    settings = relationship("FeeSettings", back_populates="category_fees")
+
+class BrandFees(Base):
+    """브랜드별 수수료"""
+    __tablename__ = "brand_fees"
+    
+    id = Column(Integer, primary_key=True)
+    settings_id = Column(Integer, ForeignKey("fee_settings.id", ondelete="CASCADE"), nullable=False)
+    category_code = Column(String(100), nullable=False)
+    category_name = Column(String(100), nullable=True)
+    import_type = Column(String(50), nullable=False)
+    brand_name = Column(String(100), nullable=False)
+    commission_rate = Column(DECIMAL(5,4), nullable=False)  # 수수료율
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    creator_id = Column(Integer, nullable=False)
+    
+    settings = relationship("FeeSettings", back_populates="brand_fees")
+
+class ItemFees(Base):
+    """품목별 수수료"""
+    __tablename__ = "item_fees"
+    
+    id = Column(Integer, primary_key=True)
+    settings_id = Column(Integer, ForeignKey("fee_settings.id", ondelete="CASCADE"), nullable=False)
+    category_code = Column(String(100), nullable=False)
+    category_name = Column(String(100), nullable=True)
+    import_type = Column(String(50), nullable=False)
+    brand_name = Column(String(100), nullable=False)
+    item_name = Column(String(100), nullable=True)
+    product_code = Column(String(50), nullable=False)
+    commission_rate = Column(DECIMAL(5,4), nullable=False)  # 수수료율
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    creator_id = Column(Integer, nullable=False)
+    
+    settings = relationship("FeeSettings", back_populates="item_fees")
+
+class ExemptBrands(Base):
+    """수수료 제외 브랜드"""
+    __tablename__ = "exempt_brands"
+    
+    id = Column(Integer, primary_key=True)
+    settings_id = Column(Integer, ForeignKey("fee_settings.id", ondelete="CASCADE"), nullable=False)
+    category_code = Column(String(100), nullable=False)
+    category_name = Column(String(100), nullable=True)
+    import_type = Column(String(50), nullable=False)
+    brand_name = Column(String(100), nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    creator_id = Column(Integer, nullable=False)
+    
+    settings = relationship("FeeSettings", back_populates="exempt_brands")

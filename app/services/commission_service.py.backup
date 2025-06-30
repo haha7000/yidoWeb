@@ -258,22 +258,22 @@ class CommissionService:
             fee_type = self._map_category_to_fee_type(category, duty_free_type)
             
             if fee_type:
-                category_query = """
-                SELECT commission_rate 
-                FROM category_fees 
-                WHERE settings_id = :settings_id 
-                AND fee_type = :fee_type
-                LIMIT 1
-                """
-                
-                category_result = self.session.execute(text(category_query), {
-                    "settings_id": settings_id,
+            category_query = """
+            SELECT commission_rate 
+            FROM category_fees 
+            WHERE settings_id = :settings_id 
+                        AND fee_type = :fee_type
+            LIMIT 1
+            """
+            
+            category_result = self.session.execute(text(category_query), {
+                "settings_id": settings_id,
                     "fee_type": fee_type
-                }).first()
-                
-                if category_result:
+            }).first()
+            
+            if category_result:
                     logger.info(f"카테고리 {category} → 구분 {fee_type}로 수수료율 발견: {category_result[0]}")
-                    return category_result[0]
+                return category_result[0]
         
         logger.warning(f"수수료율을 찾을 수 없습니다: 상품코드={product_code}, 브랜드={brand}, 카테고리={category}")
         return None

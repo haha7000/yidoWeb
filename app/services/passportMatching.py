@@ -198,30 +198,27 @@ def matching_passport(user_id, duty_free_type="lotte"):
 
 
 def get_unmatched_passports(user_id):
-    """면세점 타입에 관계없이 매칭되지 않은 여권 조회"""
+    """면세점 타입에 관계없이 매칭되지 않은 여권 조회 - Result 페이지와 동일한 로직"""
     with SessionLocal() as db:
-        # 동적 테이블 조회로 변경
         try:
-            # 롯데와 신라 모두에서 매칭되지 않은 여권 조회
+            # Result 페이지와 동일한 로직: is_matched = FALSE인 모든 여권 (id 포함)
             sql = """
-            SELECT DISTINCT p.name as passport_name, p.passport_number, p.birthday, p.file_path
+            SELECT DISTINCT p.id, p.name as passport_name, p.passport_number, p.birthday, p.file_path
             FROM passports p
             WHERE p.user_id = :user_id
             AND p.is_matched = FALSE
-            AND NOT EXISTS (
-                SELECT 1 FROM lotte_excel_data le WHERE le.name = p.name
-                UNION ALL
-                SELECT 1 FROM shilla_excel_data se WHERE se.name = p.name
-            )
             ORDER BY p.name
             """
             unmatched = db.execute(text(sql), {"user_id": user_id}).fetchall()
             
+            print(f"매칭되지 않은 여권 조회: {len(unmatched)}개 (user_id: {user_id})")
+            
             return [{
-                "passport_name": row[0],
-                "passport_number": row[1],
-                "birthday": row[2],
-                "file_path": row[3]
+                "id": row[0],
+                "passport_name": row[1],
+                "passport_number": row[2],
+                "birthday": row[3],
+                "file_path": row[4]
             } for row in unmatched]
             
         except Exception as e:
@@ -233,6 +230,7 @@ def get_unmatched_passports(user_id):
             ).all()
             
             return [{
+                "id": passport.id,
                 "passport_name": passport.name,
                 "passport_number": passport.passport_number,
                 "birthday": passport.birthday,
