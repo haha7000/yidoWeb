@@ -13,15 +13,17 @@ def shilla_matching_result(user_id):
     with SessionLocal() as session:
         print("신라 면세점 매칭 시작")
         
-        # 1단계: 여권 매칭 상태 업데이트 (엑셀 데이터 기준)
+        # 1단계: 여권 매칭 상태 업데이트 (여권번호만 기준으로 정확한 매칭)
         sql_update_passport_from_excel = """
         UPDATE passports p
         SET is_matched = TRUE
         FROM shilla_excel_data se
-        WHERE (p.passport_number = se.passport_number OR p.name = se.name)
+        WHERE p.passport_number = se.passport_number
         AND p.user_id = :user_id
         AND se.passport_number IS NOT NULL
         AND se.passport_number != ''
+        AND p.passport_number IS NOT NULL
+        AND p.passport_number != ''
         AND p.is_matched = FALSE
         """
         passport_updated1 = session.execute(text(sql_update_passport_from_excel), {"user_id": user_id}).rowcount
@@ -51,21 +53,29 @@ def shilla_matching_result(user_id):
             MAX(se.passport_number) as excel_passport_number,
             MAX(p.name) as passport_name,
             MAX(p.birthday) as passport_birthday,
-            MAX(p.is_matched) as passport_is_matched,
+            BOOL_OR(p.is_matched) as passport_is_matched,
             -- 집계된 상품 정보
             MIN(se."매출일자") as sales_date,
             STRING_AGG(DISTINCT se."카테고리", ', ') as categories,
             STRING_AGG(DISTINCT se."브랜드명", ', ') as brands,
             COUNT(se."상품코드") as product_count,
-            SUM(COALESCE(se."할인액(￦)", 0)) as total_discount_krw,
-            SUM(COALESCE(se."판매가($)", 0)) as total_sales_usd,
-            SUM(COALESCE(se."순매출액(￦)", 0)) as total_net_sales_krw,
+            SUM(CASE WHEN se."할인액(￦)" IS NOT NULL AND se."할인액(￦)" != '' 
+                     THEN CAST(se."할인액(￦)" AS NUMERIC) 
+                     ELSE 0 END) as total_discount_krw,
+            SUM(CASE WHEN se."판매가($)" IS NOT NULL AND se."판매가($)" != '' 
+                     THEN CAST(se."판매가($)" AS NUMERIC) 
+                     ELSE 0 END) as total_sales_usd,
+            SUM(CASE WHEN se."순매출액(￦)" IS NOT NULL AND se."순매출액(￦)" != '' 
+                     THEN CAST(se."순매출액(￦)" AS NUMERIC) 
+                     ELSE 0 END) as total_net_sales_krw,
             MIN(se."점") as store_branch
         FROM shilla_receipts sr
         LEFT JOIN shilla_excel_data se ON se."receiptNumber"::text = sr.receipt_number
         LEFT JOIN passports p
-          ON (sr.passport_number = p.passport_number OR se.passport_number = p.passport_number) 
+          ON p.passport_number = COALESCE(sr.passport_number, se.passport_number)
           AND p.user_id = :user_id
+          AND p.passport_number IS NOT NULL
+          AND p.passport_number != ''
         WHERE sr.user_id = :user_id
         GROUP BY sr.receipt_number
         ORDER BY sr.receipt_number
@@ -133,7 +143,7 @@ def shilla_matching_result(user_id):
                 except (ValueError, TypeError, AttributeError):
                     return None
             
-            # 영수증 단위 매칭 로그 생성
+            # 영수증 단위 매칭 로그 생성 (들여쓰기 수정)
                 match_log = ReceiptMatchLog(
                     user_id=user_id,
                     receipt_number=receipt_number,
@@ -265,37 +275,60 @@ def fetch_shilla_results(user_id):
 def fetch_shilla_results_with_receipt_ids(user_id):
     """
     신라 면세점 결과 조회 - 영수증 ID도 포함하여 반환 (향상된 버전)
-    edit_unmatched에서 수정된 데이터도 반영
+    edit_unmatched에서 수정된 데이터도 반영, 데이터 정합성 문제 해결
     """
     with SessionLocal() as db:
         print(f"신라 결과 조회 시작 (영수증 ID 포함, 향상된 버전) - 사용자 {user_id}")
         
-        # 매칭된 영수증 정보 조회 - 향상된 쿼리
+        # 매칭된 영수증 정보 조회 - 중복 제거 및 정합성 개선
         matched_sql = """
-        SELECT DISTINCT 
+        WITH receipt_passport_mapping AS (
+            -- 영수증별 여권번호 매핑 (우선순위: 영수증 여권번호 > 엑셀 여권번호)
+            SELECT 
             sr.id as receipt_id,
             sr.receipt_number,
-            se.name as excel_name,
             sr.passport_number as receipt_passport_number,
             se.passport_number as excel_passport_number,
+                se.name as excel_name,
+                se."PayBack" as payback_amount,
+                COALESCE(sr.passport_number, se.passport_number) as final_passport_number
+            FROM shilla_receipts sr
+            JOIN shilla_excel_data se ON se."receiptNumber"::text = sr.receipt_number
+            WHERE sr.user_id = :user_id
+        ),
+        passport_info AS (
+            -- 여권 정보 조회
+            SELECT 
+                rpm.*,
             p.name as passport_name,
             p.birthday as passport_birthday,
             p.is_matched as passport_is_matched,
             CASE 
                 WHEN p.passport_number IS NOT NULL AND p.is_matched = TRUE THEN 'passport_matched'
                 WHEN p.passport_number IS NOT NULL AND p.is_matched = FALSE THEN 'passport_needs_update'  
-                WHEN p.passport_number IS NULL AND (sr.passport_number IS NOT NULL OR se.passport_number IS NOT NULL) THEN 'passport_missing'
-                WHEN p.passport_number IS NULL AND sr.passport_number IS NULL AND se.passport_number IS NULL THEN 'passport_not_provided'
+                    WHEN p.passport_number IS NULL AND rpm.final_passport_number IS NOT NULL THEN 'passport_missing'
+                    WHEN p.passport_number IS NULL AND rpm.final_passport_number IS NULL THEN 'passport_not_provided'
                 ELSE 'passport_unknown'
-            END as passport_status,
-            COALESCE(p.name, se.name) as order_name,
-            se."PayBack" as payback_amount
-        FROM shilla_receipts sr
-        JOIN shilla_excel_data se ON se."receiptNumber"::text = sr.receipt_number
-        LEFT JOIN passports p ON (sr.passport_number = p.passport_number OR se.passport_number = p.passport_number) 
+                END as passport_status
+            FROM receipt_passport_mapping rpm
+            LEFT JOIN passports p ON p.passport_number = rpm.final_passport_number 
                                AND p.user_id = :user_id
-        WHERE sr.user_id = :user_id
-        ORDER BY order_name, sr.receipt_number
+        )
+        SELECT 
+            receipt_id,
+            receipt_number,
+            excel_name,
+            receipt_passport_number,
+            excel_passport_number,
+            passport_name,
+            passport_birthday,
+            passport_is_matched,
+            passport_status,
+            COALESCE(passport_name, excel_name) as order_name,
+            payback_amount,
+            final_passport_number
+        FROM passport_info
+        ORDER BY order_name, receipt_number
         """
         matched = db.execute(text(matched_sql), {"user_id": user_id}).fetchall()
         
@@ -309,37 +342,31 @@ def fetch_shilla_results_with_receipt_ids(user_id):
         """
         unmatched = db.execute(text(unmatched_sql), {"user_id": user_id}).fetchall()
         
-        # 매칭된 결과를 고객별로 그룹화 (향상된 로직)
+        # 매칭된 결과를 고객별로 그룹화 (정합성 개선)
         customer_data = {}
         receipt_id_mapping = {}
         
         for row in matched:
             (receipt_id, receipt_number, excel_name, receipt_passport_number, 
              excel_passport_number, passport_name, passport_birthday, 
-             passport_is_matched, passport_status, order_name, payback_amount) = row
+             passport_is_matched, passport_status, order_name, payback_amount,
+             final_passport_number) = row
             
             # 영수증 ID 매핑 저장
             receipt_id_mapping[receipt_number] = receipt_id
             
-            # 최종 여권번호 결정
-            final_passport_number = receipt_passport_number or excel_passport_number
-            
-            # 신라 면세점의 경우: 여권과 매칭이 완료되면 여권의 실제 이름을 사용
-            final_excel_name = excel_name
-            if final_passport_number and passport_name:
-                final_excel_name = passport_name
-            
             # 표시할 이름 결정: 여권 풀네임 우선, 없으면 엑셀 성씨
             display_name = passport_name if passport_name else excel_name
             
-            # 그룹화 키 결정 (여권번호 기준, 없으면 엑셀명 기준)
+            # 그룹화 키 결정 (정확한 매칭을 위해)
             if final_passport_number:
                 group_key = f"passport_{final_passport_number}"
             else:
-                group_key = f"excel_{excel_name}_{receipt_number}"  # 여권번호가 없으면 개별 처리
+                # 여권번호가 없는 경우 엑셀 이름별로 그룹화
+                group_key = f"excel_{excel_name}"
             
             if group_key not in customer_data:
-                # 매칭 상태 판단 (향상된 로직)
+                # 매칭 상태 판단 (정확한 로직)
                 if passport_status == 'passport_matched':
                     match_status = '매칭됨'
                     needs_update = False
@@ -350,7 +377,7 @@ def fetch_shilla_results_with_receipt_ids(user_id):
                     match_status = '여권 정보 없음'
                     needs_update = True
                 elif passport_status == 'passport_not_provided':
-                    match_status = '여권번호 미제공'
+                    match_status = '여권 정보 없음'
                     needs_update = True
                 else:
                     match_status = '확인 필요'
@@ -511,7 +538,7 @@ def fetch_shilla_results_with_details(user_id):
                 WHEN p.passport_number IS NOT NULL AND p.is_matched = TRUE THEN 'passport_matched'
                 WHEN p.passport_number IS NOT NULL AND p.is_matched = FALSE THEN 'passport_needs_update'  
                 WHEN p.passport_number IS NULL AND (sr.passport_number IS NOT NULL OR se.passport_number IS NOT NULL) THEN 'passport_missing'
-                WHEN p.passport_number IS NULL AND sr.passport_number IS NULL AND se.passport_number IS NULL THEN 'passport_not_provided'
+                WHEN p.passport_number IS NULL AND sr.passport_number IS NULL AND se.passport_number IS NULL THEN 'passport_missing'
                 ELSE 'passport_unknown'
             END as passport_status,
             COALESCE(p.name, se.name) as order_name,
@@ -588,7 +615,7 @@ def fetch_shilla_results_with_details(user_id):
                     match_status = '여권 정보 없음'
                     needs_update = True
                 elif passport_status == 'passport_not_provided':
-                    match_status = '여권번호 미제공'
+                    match_status = '여권 정보 없음'
                     needs_update = True
                 else:
                     match_status = '확인 필요'

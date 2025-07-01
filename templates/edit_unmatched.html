@@ -544,7 +544,7 @@ function setupFormSubmission() {
                 if (result.success) {
                     if (result.matched) {
                         // 매칭 성공 - 다음 영수증으로 이동
-                        showSuccess(`매칭 성공! ${result.message}`);
+                        showSuccess('매칭 완료');
                         
                         if (result.has_more && result.next_receipt) {
                             setTimeout(() => {
@@ -557,7 +557,7 @@ function setupFormSubmission() {
                         }
                     } else {
                         // 매칭 실패 - 같은 페이지에 머물면서 오류 메시지 표시
-                        showError(`매칭 실패: ${result.message}`);
+                        showError('매칭 실패');
                         receiptInput.classList.add('input-error');
                     }
                 } else {

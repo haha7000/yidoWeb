@@ -339,7 +339,7 @@ async function skipToNext() {
     // 폼 제출 처리
     document.getElementById('update-passport-form').addEventListener('submit', async function(e) {
         e.preventDefault();
-    clearMessages();
+        clearMessages();
 
         const nameInput = document.querySelector('input[name="new_name"]');
         const newName = nameInput.value.trim();
@@ -352,12 +352,12 @@ async function skipToNext() {
 
         nameInput.classList.remove('input-error');
     
-    // 버튼 비활성화
-    const saveBtn = document.getElementById('save-btn');
-    const skipBtn = document.getElementById('skip-btn');
-    saveBtn.disabled = true;
-    skipBtn.disabled = true;
-    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
+        // 버튼 비활성화
+        const saveBtn = document.getElementById('save-btn');
+        const skipBtn = document.getElementById('skip-btn');
+        saveBtn.disabled = true;
+        skipBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
         
         const formData = new FormData(this);
         
@@ -368,12 +368,31 @@ async function skipToNext() {
             });
             
             if (response.ok) {
-            showSuccess('여권 정보가 저장되었습니다. 다음 여권으로 이동합니다...');
-            
-            // 1초 후 자동 리다이렉트 (서버에서 이미 처리됨)
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (result.matched) {
+                        // 매칭 성공 - 다음 이미지로 이동
+                        showSuccess('매칭 완료');
+                        
+                        if (result.has_more && result.next_passport) {
+                            setTimeout(() => {
+                                window.location.href = `/edit_passport_by_id/${result.next_passport.id}`;
+                            }, 1000);
+                        } else {
+                            setTimeout(() => {
+                                window.location.href = '/unmatched-passports/';
+                            }, 2000);
+                        }
+                    } else {
+                        // 매칭 실패 - 같은 페이지에 머물면서 오류 메시지 표시
+                        showError('매칭 실패');
+                        nameInput.classList.add('input-error');
+                    }
+                } else {
+                    showError('저장 중 오류가 발생했습니다.');
+                    nameInput.classList.add('input-error');
+                }
             } else {
                 // 오류 처리
                 const contentType = response.headers.get('Content-Type');
@@ -393,11 +412,11 @@ async function skipToNext() {
             console.error('Error updating passport:', error);
             showError('네트워크 오류가 발생했습니다.');
             nameInput.classList.add('input-error');
-    } finally {
-        // 버튼 복원
-        saveBtn.disabled = false;
-        skipBtn.disabled = false;
-        saveBtn.innerHTML = '<i class="fas fa-save"></i> 저장 및 다음으로';
+        } finally {
+            // 버튼 복원
+            saveBtn.disabled = false;
+            skipBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-save"></i> 저장 및 다음으로';
         }
     });
 

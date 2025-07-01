@@ -75,19 +75,21 @@ def ShillaAiOcr(imagePath, user_id):
 
         saved_data = False
 
-        # 영수증 처리 (기존과 동일)
+        # 영수증 처리 (여권번호 포함)
         if "receipts" in parsed_result and parsed_result["receipts"]:
             for receipt in parsed_result["receipts"]:
                 receiptNumber = receipt.get('receiptNumber', '')
+                passportNumber = receipt.get('passportNumber', '')  # 여권번호도 추출
                 if receiptNumber:  # 빈 문자열이 아닌 경우만 추가
                     new_receipt = ShillaReceipt(
                         user_id=user_id,
                         receipt_number=receiptNumber,
+                        passport_number=passportNumber if passportNumber else None,  # 여권번호 저장
                         file_path=imagePath
                     )
                     db.add(new_receipt)
                     saved_data = True
-                    print(f"신라 영수증 저장: {receiptNumber}")
+                    print(f"신라 영수증 저장: {receiptNumber}, 여권번호: {passportNumber if passportNumber else '없음'}")
 
         # 여권 처리 (날짜 검증 추가)
         if "passports" in parsed_result and parsed_result["passports"]:

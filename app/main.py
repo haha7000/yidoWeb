@@ -33,6 +33,70 @@ from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+def fix_excel_datetime_format(excel_path):
+    """
+    엑셀 파일의 잘못된 날짜 형식을 수정하는 함수
+    20250222T000000 -> 2025-02-22T00:00:00
+    """
+    import zipfile
+    import re
+    import tempfile
+    
+    try:
+        temp_dir = tempfile.mkdtemp()
+        fixed_path = os.path.join(temp_dir, "fixed_" + os.path.basename(excel_path))
+        
+        # 엑셀 파일을 ZIP으로 처리
+        with zipfile.ZipFile(excel_path, 'r') as zip_ref:
+            zip_ref.extractall(temp_dir)
+        
+        # 워크시트 XML 파일들을 찾아서 수정
+        worksheet_dir = os.path.join(temp_dir, 'xl', 'worksheets')
+        date_fixed = False
+        
+        if os.path.exists(worksheet_dir):
+            for filename in os.listdir(worksheet_dir):
+                if filename.endswith('.xml'):
+                    worksheet_path = os.path.join(worksheet_dir, filename)
+                    
+                    # XML 파일 읽기
+                    with open(worksheet_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # 문제가 되는 날짜 형식 수정
+                    # 패턴: 20250222T000000 -> 2025-02-22T00:00:00
+                    pattern = r'(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})'
+                    replacement = r'\1-\2-\3T\4:\5:\6'
+                    
+                    new_content = re.sub(pattern, replacement, content)
+                    
+                    if new_content != content:
+                        date_fixed = True
+                        print(f"  📅 날짜 형식 수정: {filename}")
+                        # 수정된 내용 저장
+                        with open(worksheet_path, 'w', encoding='utf-8') as f:
+                            f.write(new_content)
+        
+        if date_fixed:
+            # 수정된 파일들을 다시 압축
+            with zipfile.ZipFile(fixed_path, 'w', zipfile.ZIP_DEFLATED) as zip_ref:
+                for root, dirs, files in os.walk(temp_dir):
+                    for file in files:
+                        if file.startswith('fixed_'):  # 수정된 파일은 제외
+                            continue
+                        file_path = os.path.join(root, file)
+                        arc_name = os.path.relpath(file_path, temp_dir)
+                        zip_ref.write(file_path, arc_name)
+            
+            return fixed_path
+        else:
+            # 수정이 필요하지 않은 경우
+            return None
+            
+    except Exception as e:
+        print(f"❌ 엑셀 날짜 형식 수정 중 오류: {e}")
+        return None
+
 app = FastAPI(debug=True)
 app.mount("/static", StaticFiles(directory=settings.static_dir), name="static")
 app.mount("/uploads", StaticFiles(directory=settings.uploads_dir, html=True), name="uploads")
@@ -85,20 +149,28 @@ def assign_upload_id_to_data(user_id: int, upload_id: str, db: Session):
         raise
 
 def calculate_fully_matched_customers(user_id: int, duty_free_type: str, db: Session) -> int:
-    """영수증과 여권이 모두 매칭된 고객 수 계산"""
+    """영수증과 여권이 모두 매칭된 고객 수 계산 (정확한 카운팅)"""
     try:
         if duty_free_type == "shilla":
-            # 신라 면세점: 영수증에 여권번호가 있고, 해당 여권번호가 passports 테이블에 존재하는 경우
+            # 신라 면세점: 실제 여권 테이블의 개수 기준으로 정확히 계산
             sql = text("""
-                SELECT COUNT(DISTINCT sr.passport_number) as fully_matched_count
-                FROM shilla_receipts sr
-                INNER JOIN passports p ON sr.passport_number = p.passport_number 
-                    AND sr.user_id = p.user_id
-                WHERE sr.user_id = :user_id 
-                    AND sr.passport_number IS NOT NULL 
-                    AND sr.passport_number != ''
+                WITH matched_passports AS (
+                    SELECT DISTINCT p.passport_number, p.name
+                    FROM passports p
+                    WHERE p.user_id = :user_id 
+                        AND p.is_matched = TRUE
                     AND p.passport_number IS NOT NULL
                     AND p.passport_number != ''
+                        AND EXISTS (
+                            SELECT 1 FROM shilla_receipts sr 
+                            WHERE (sr.passport_number = p.passport_number OR 
+                                   EXISTS (SELECT 1 FROM shilla_excel_data se 
+                                          WHERE se.passport_number = p.passport_number))
+                            AND sr.user_id = p.user_id
+                        )
+                )
+                SELECT COUNT(*) as fully_matched_count
+                FROM matched_passports
             """)
         else:
             # 롯데 면세점: receipt_match_log에서 매칭된 고객 중 여권 정보가 완전한 경우
@@ -301,6 +373,41 @@ async def upload_excel(
     try:
         start_time = time.time()
         
+        # openpyxl 날짜 파싱 오류 우회를 위한 강력한 패치
+        try:
+            # 모든 가능한 경로에서 패치 적용
+            import openpyxl.utils.datetime
+            from openpyxl.utils.datetime import from_ISO8601
+            from openpyxl.worksheet._reader import WorksheetReader
+            
+            original_from_ISO8601 = from_ISO8601
+            
+            def patched_from_ISO8601(formatted_string):
+                try:
+                    return original_from_ISO8601(formatted_string)
+                except ValueError as e:
+                    if "Invalid datetime value" in str(e):
+                        # 잘못된 날짜 형식을 문자열로 반환
+                        print(f"⚠️ 잘못된 날짜 형식을 문자열로 처리: {formatted_string}")
+                        return str(formatted_string)
+                    else:
+                        raise e
+            
+            # 모든 경로에 패치 적용
+            openpyxl.utils.datetime.from_ISO8601 = patched_from_ISO8601
+            
+            # WorksheetReader에서도 사용하는 경우 대비
+            if hasattr(WorksheetReader, 'from_ISO8601'):
+                WorksheetReader.from_ISO8601 = patched_from_ISO8601
+            
+            print("✅ openpyxl 강력한 날짜 파싱 패치 적용 완료")
+        except Exception as patch_error:
+            print(f"⚠️ openpyxl 패치 실패 (계속 진행): {patch_error}")
+        
+        # 추가: pandas에서 엑셀 엔진을 강제로 openpyxl 대신 다른 방법 사용
+        import warnings
+        warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
+        
         # 면세점 타입 변환
         duty_free_enum = DutyFreeType.LOTTE if duty_free_type == "lotte" else DutyFreeType.SHILLA
         
@@ -312,6 +419,18 @@ async def upload_excel(
         with open(tmp_path, "wb") as f:
             shutil.copyfileobj(excel_file.file, f)
         
+        # 엑셀 파일의 날짜 형식 자동 수정
+        try:
+            print("📝 엑셀 파일 날짜 형식 검사 및 수정 중...")
+            fixed_path = fix_excel_datetime_format(tmp_path)
+            if fixed_path:
+                tmp_path = fixed_path
+                print("✅ 엑셀 파일 날짜 형식 수정 완료")
+            else:
+                print("ℹ️ 날짜 형식 수정이 필요하지 않습니다")
+        except Exception as fix_error:
+            print(f"⚠️ 날짜 형식 수정 실패 (원본 사용): {fix_error}")
+        
         records_before = 0
         records_added = 0
         
@@ -321,8 +440,8 @@ async def upload_excel(
             
             # 롯데 엑셀 데이터 처리
             try:
-                # 멀티헤더 엑셀 파일 읽기
-                df = pd.read_excel(tmp_path, header=[0, 1])
+                # 멀티헤더 엑셀 파일 읽기 (날짜 자동 파싱 비활성화)
+                df = pd.read_excel(tmp_path, header=[0, 1], dtype=str)
                 
                 # 병합된 멀티헤더를 1단 컬럼으로 변환
                 df.columns = [f"{str(a).strip()}_{str(b).strip()}" if 'Unnamed' not in str(b) else str(a).strip()
@@ -367,7 +486,7 @@ async def upload_excel(
             except Exception as e:
                 # 단순 헤더 파일로 다시 시도
                 print(f"멀티헤더 처리 실패, 단순 헤더로 재시도: {e}")
-                df = pd.read_excel(tmp_path)
+                df = pd.read_excel(tmp_path, dtype=str)
                 print(f"단순 헤더 컬럼들: {list(df.columns)}")
                 
                 # 컬럼명 변경
@@ -394,7 +513,7 @@ async def upload_excel(
             table_name = 'shilla_excel_data'
             
             # 신라 엑셀 데이터 처리 (단순한 헤더 구조)
-            df = pd.read_excel(tmp_path, dtype={'BILL 번호': str})
+            df = pd.read_excel(tmp_path, dtype=str)
             print(f"신라 엑셀 원본 컬럼들: {list(df.columns)}")
 
             # 컬럼명 변경
@@ -524,8 +643,15 @@ async def upload_excel(
         
         # 임시 파일 정리
         if tmp_path and os.path.exists(tmp_path):
-            os.remove(tmp_path)
-        # 임시 디렉토리도 삭제
+            # fix_excel_datetime_format에서 생성된 임시 디렉토리도 정리
+            if 'fixed_' in os.path.basename(tmp_path):
+                # 수정된 파일의 임시 디렉토리 정리
+                fixed_temp_dir = os.path.dirname(tmp_path)
+                if os.path.exists(fixed_temp_dir):
+                    shutil.rmtree(fixed_temp_dir)
+            else:
+                os.remove(tmp_path)
+        # 원본 임시 디렉토리도 삭제
         if 'temp_dir' in locals() and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
         
@@ -1486,6 +1612,9 @@ async def update_passport_by_id(
             db.commit()
             print(f"여권 정보 업데이트 완료: {old_name} (ID: {passport_id}) -> {new_name}")
             
+            # 매칭 성공 여부 확인
+            is_matched = excel_result is not None
+            
             # 다음 매칭되지 않은 여권 찾기 (ID 기반)
             unmatched_passports = get_unmatched_passports(current_user.id)
             
@@ -1499,28 +1628,24 @@ async def update_passport_by_id(
                 if passport_item.get('id') == passport_id:
                     current_found = True
             
-            # 다음 여권이 있으면 해당 여권 편집 페이지로, 없으면 목록 페이지로
-            if next_passport:
-                return RedirectResponse(
-                    url=f"/edit_passport_by_id/{next_passport['id']}",
-                    status_code=303
-                )
-            else:
-                return RedirectResponse(
-                    url="/unmatched-passports/",
-                    status_code=303
-                )
+            # JSON 응답으로 결과 반환
+            return {
+                "success": True,
+                "matched": is_matched,
+                "message": "매칭 완료" if is_matched else "매칭 실패 - 엑셀 데이터에서 해당 이름을 찾을 수 없습니다",
+                "next_passport": {
+                    "id": next_passport['id'],
+                    "name": next_passport['passport_name']
+                } if next_passport else None,
+                "has_more": next_passport is not None
+            }
             
         except HTTPException:
             raise
         except Exception as e:
             db.rollback()
             print(f"update_passport_by_id 오류: {str(e)}")
-            # 오류 발생 시 현재 페이지로 다시 리다이렉트
-            return RedirectResponse(
-                url=f"/edit_passport_by_id/{passport_id}?error={str(e)}",
-                status_code=303
-            )
+            raise HTTPException(status_code=500, detail=f"업데이트 중 오류가 발생했습니다: {str(e)}")
 
 @app.post("/update_passport/{name}")
 async def update_passport(
@@ -1619,13 +1744,17 @@ async def update_passport(
                 if current_found:
                     next_passport = passport_item
                     break
-                if passport_item.name == name:
+                # passport_item은 딕셔너리이므로 키로 접근
+                passport_name = passport_item.get('passport_name') if isinstance(passport_item, dict) else passport_item.name
+                if passport_name == name:
                     current_found = True
             
             # 다음 여권이 있으면 해당 여권 편집 페이지로, 없으면 목록 페이지로
             if next_passport:
+                # next_passport도 딕셔너리 형태
+                next_name = next_passport.get('passport_name') if isinstance(next_passport, dict) else next_passport.name
                 return RedirectResponse(
-                    url=f"/edit_passport/{next_passport.name}",
+                    url=f"/edit_passport/{next_name}",
                     status_code=303
                 )
             else:
