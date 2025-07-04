@@ -1,4 +1,3 @@
-
 # app/services/passportMatching.py - 수정된 버전
 
 from app.models.models import Receipt, ReceiptMatchLog, Passport, User, DutyFreeType
@@ -58,9 +57,8 @@ def matching_passport(user_id, duty_free_type="lotte"):
     """면세점 타입에 따라 여권 매칭 정보 반환 - 상세 정보 포함"""
     with SessionLocal() as db:
         if duty_free_type == "shilla":
-            # 신라 면세점용 처리
-            from app.services.shilla_matching import fetch_shilla_results_with_details
-            matched_list, unmatched = fetch_shilla_results_with_details(user_id)
+            # 신라 면세점용 처리 - fetch_results 재사용
+            matched_list, unmatched = fetch_results(user_id, duty_free_type)
             
             # 상세 정보를 포함한 passport_info 형태로 변환
             passport_info = []
@@ -87,29 +85,7 @@ def matching_passport(user_id, duty_free_type="lotte"):
             return passport_info
             
         else:
-            # 롯데 면세점 로직 - 상세 정보 포함
-            # 매칭된 데이터에서 상세 정보 조회 (store_branch 포함)
-            matched_sql = """
-            SELECT DISTINCT 
-                rml.excel_name,
-                rml.receipt_number,
-                rml.passport_number,
-                rml.birthday,
-                rml.sales_date,
-                rml.category,
-                rml.brand,
-                rml.product_code,
-                rml.discount_amount_krw,
-                rml.sales_price_usd,
-                rml.net_sales_krw,
-                rml.store_branch
-            FROM receipt_match_log rml
-            JOIN receipts r ON r.receipt_number = rml.receipt_number AND r.user_id = rml.user_id
-            WHERE rml.is_matched = TRUE 
-            AND rml.user_id = :user_id
-            ORDER BY rml.excel_name, rml.receipt_number
-            """
-            matched_results = db.execute(text(matched_sql), {"user_id": user_id}).fetchall()
+            matched_results, unmatched = fetch_results(user_id, duty_free_type)
             
             print(f"사용자 {user_id}의 롯데 매칭 정보 (상세 포함): {len(matched_results)}건")
             
@@ -120,7 +96,7 @@ def matching_passport(user_id, duty_free_type="lotte"):
             customer_details = {}
             
             for row in matched_results:
-                (excel_name, receipt_number, passport_number, birthday,
+                (receipt_number, excel_name, passport_number, birthday,
                  sales_date, category, brand, product_code, 
                  discount_amount_krw, sales_price_usd, net_sales_krw, store_branch) = row
                 
@@ -179,17 +155,6 @@ def matching_passport(user_id, duty_free_type="lotte"):
                 print(f"  - 영수증: {', '.join(receipt_numbers)}")
                 print("-" * 50)
         
-            # 매칭되지 않은 영수증 조회
-            unmatched_sql = """
-            SELECT DISTINCT r.*
-            FROM receipts r
-            JOIN receipt_match_log rml ON r.receipt_number = rml.receipt_number
-            WHERE rml.is_matched = FALSE 
-            AND r.user_id = :user_id 
-            AND rml.user_id = :user_id
-            """
-            unmatched = db.execute(text(unmatched_sql), {"user_id": user_id}).fetchall()
-            
             print(f"\n=== 매칭되지 않은 영수증 ===")
             for receipt in unmatched:
                 print(f"영수증 번호: {receipt.receipt_number}")
@@ -257,3 +222,80 @@ def update_passport_matching_status(passport_name: str, is_matched: bool, user_i
             db.commit()
             return True
         return False
+
+
+def get_matched_passports(user_id):
+    """매칭된 여권 조회 - 수정 가능한 매칭된 여권 목록"""
+    with SessionLocal() as db:
+        try:
+            # 매칭된 여권들 조회 (ID 포함)
+            sql = """
+            SELECT DISTINCT 
+                p.id, 
+                p.name as passport_name, 
+                p.passport_number, 
+                p.birthday, 
+                p.file_path,
+                p.is_matched,
+                CASE 
+                    WHEN rml.receipt_number IS NOT NULL THEN '롯데 매칭됨'
+                    WHEN se.passport_number IS NOT NULL THEN '신라 매칭됨'
+                    WHEN sr.passport_number IS NOT NULL THEN '신라 영수증 매칭됨'
+                    ELSE '매칭됨'
+                END as match_type,
+                COALESCE(rml.excel_name, se.name) as matched_excel_name,
+                COALESCE(rml.receipt_number, se."receiptNumber"::text, sr.receipt_number) as matched_receipt
+            FROM passports p
+            LEFT JOIN receipt_match_log rml ON p.passport_number = rml.passport_number AND rml.user_id = p.user_id
+            LEFT JOIN shilla_excel_data se ON p.passport_number = se.passport_number
+            LEFT JOIN shilla_receipts sr ON p.passport_number = sr.passport_number AND sr.user_id = p.user_id
+            WHERE p.user_id = :user_id
+            AND p.is_matched = TRUE
+            AND (
+                rml.passport_number IS NOT NULL 
+                OR se.passport_number IS NOT NULL 
+                OR sr.passport_number IS NOT NULL
+            )
+            ORDER BY p.name
+            """
+            matched = db.execute(text(sql), {"user_id": user_id}).fetchall()
+            
+            print(f"매칭된 여권 조회: {len(matched)}개 (user_id: {user_id})")
+            
+            result = []
+            for row in matched:
+                result.append({
+                    "id": row[0],
+                    "passport_name": row[1],
+                    "passport_number": row[2],
+                    "birthday": row[3],
+                    "file_path": row[4],
+                    "is_matched": row[5],
+                    "match_type": row[6],
+                    "matched_excel_name": row[7],
+                    "matched_receipt": row[8]
+                })
+                
+                print(f"매칭된 여권: {row[1]} ({row[2]}) - {row[6]} → {row[7]}")
+            
+            return result
+            
+        except Exception as e:
+            print(f"매칭된 여권 조회 오류: {e}")
+            # 기본 조회
+            matched = db.query(Passport).filter(
+                Passport.user_id == user_id,
+                Passport.is_matched == True
+            ).all()
+            
+            return [{
+                "id": passport.id,
+                "passport_name": passport.name,
+                "passport_number": passport.passport_number,
+                "birthday": passport.birthday,
+                "file_path": passport.file_path,
+                "is_matched": passport.is_matched,
+                "match_type": "매칭됨",
+                "matched_excel_name": "알 수 없음",
+                "matched_receipt": "알 수 없음"
+            } for passport in matched]

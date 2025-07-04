@@ -54,12 +54,16 @@
                             </td>
                             <td>
                                 {% if passport.file_path %}
-                                <button type="button" class="btn btn-outline-info btn-sm" 
-                                        data-bs-toggle="modal" 
-                                        data-bs-target="#imageModal" 
-                                        onclick="showImage('{{ passport.file_path }}')">
-                                    <i class="fas fa-eye"></i> 보기
-                                </button>
+                                {% set filename = passport.file_path.split('/')[-1] if '/' in passport.file_path else passport.file_path %}
+                                <div class="image-hover-container">
+                                    <button type="button" class="btn btn-outline-info btn-sm image-hover-btn" 
+                                            data-image-src="/uploads/{{ filename }}">
+                                        <i class="fas fa-eye"></i> 보기
+                                    </button>
+                                    <div class="image-hover-tooltip">
+                                        <img src="/uploads/{{ filename }}" alt="여권 이미지" loading="lazy">
+                                    </div>
+                                </div>
                                 {% else %}
                                 <span class="text-muted">없음</span>
                                 {% endif %}
@@ -99,33 +103,7 @@
     {% endif %}
 </div>
 
-<!-- 이미지 모달 -->
-<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="imageModalLabel">여권 이미지</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body text-center">
-                <div class="image-container" style="max-height: 500px; overflow: auto;">
-                    <img id="modalImage" src="" alt="Passport Image" class="img-fluid" style="max-width: 100%; height: auto;">
-                </div>
-                <div class="zoom-controls mt-3">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="zoomIn()">
-                        <i class="fas fa-search-plus"></i> 확대
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="zoomOut()">
-                        <i class="fas fa-search-minus"></i> 축소
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetZoom()">
-                        <i class="fas fa-undo"></i> 초기화
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+
 
 <!-- 유형 변경 모달 -->
 <div class="modal fade" id="changeTypeModal" tabindex="-1">
@@ -160,25 +138,70 @@
 </div>
 
 <script>
-    function showImage(imagePath) {
-        console.log('unmatched_passports.html - showImage 호출됨');
-        console.log('원본 imagePath:', imagePath);
-        const modalImage = document.getElementById('modalImage');
-        const filename = imagePath.split('/').pop();
-        console.log('추출된 filename:', filename);
-        const finalSrc = '/uploads/' + filename;
-        console.log('최종 이미지 경로:', finalSrc);
-        modalImage.src = finalSrc;
-        setCurrentImage('modalImage');
-        resetZoom();
-    }
-
-    // 모달이 닫힐 때 이미지 리셋
-    document.getElementById('imageModal').addEventListener('hidden.bs.modal', function () {
-        resetZoom();
-    });
-
     let currentPassportId = null;
+
+    // 디버깅을 위한 호버 이벤트 추가
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('unmatched_passports.html - DOM 로드 완료');
+        
+        // 모든 이미지 호버 컨테이너에 이벤트 리스너 추가
+        const hoverContainers = document.querySelectorAll('.image-hover-container');
+        console.log('발견된 호버 컨테이너 수:', hoverContainers.length);
+        
+        hoverContainers.forEach((container, index) => {
+            const tooltip = container.querySelector('.image-hover-tooltip');
+            const button = container.querySelector('.image-hover-btn');
+            const img = tooltip ? tooltip.querySelector('img') : null;
+            
+            console.log(`컨테이너 ${index + 1}:`, {
+                container: container,
+                tooltip: tooltip,
+                button: button,
+                img: img,
+                imgSrc: img ? img.src : 'N/A'
+            });
+            
+            // 마우스 이벤트 추가
+            container.addEventListener('mouseenter', function() {
+                console.log(`컨테이너 ${index + 1} 호버 시작`);
+                if (tooltip) {
+                    tooltip.style.opacity = '1';
+                    tooltip.style.visibility = 'visible';
+                    console.log('툴팁 표시됨');
+                }
+            });
+            
+            container.addEventListener('mouseleave', function() {
+                console.log(`컨테이너 ${index + 1} 호버 끝`);
+                if (tooltip) {
+                    tooltip.style.opacity = '0';
+                    tooltip.style.visibility = 'hidden';
+                    console.log('툴팁 숨겨짐');
+                }
+            });
+            
+            // 이미지 로드 이벤트
+            if (img) {
+                img.addEventListener('load', function() {
+                    console.log(`이미지 로드 성공: ${img.src}`);
+                });
+                
+                img.addEventListener('error', function() {
+                    console.log(`이미지 로드 실패: ${img.src}`);
+                });
+            }
+        });
+        
+        // 전체 화면 클릭으로 툴팁 닫기
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.image-hover-container')) {
+                document.querySelectorAll('.image-hover-tooltip').forEach(tooltip => {
+                    tooltip.style.opacity = '0';
+                    tooltip.style.visibility = 'hidden';
+                });
+            }
+        });
+    });
 
     // 유형 변경 모달 표시
     function showChangeTypeModal(passportId, imagePath) {
@@ -232,4 +255,75 @@
         }
     }
 </script>
+
+<style>
+/* 이미지 호버 툴팁 스타일 - 강화된 버전 */
+.image-hover-container {
+    position: relative !important;
+    display: inline-block !important;
+}
+
+.image-hover-tooltip {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    background: transparent !important;  /* 배경 투명 */
+    border: none !important;  /* 테두리 제거 */
+    border-radius: 0 !important;  /* 둥근 모서리 제거 */
+    box-shadow: none !important;  /* 그림자 제거 */
+    padding: 0 !important;  /* 패딩 제거 */
+    z-index: 99999 !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    transition: all 0.3s ease !important;
+    pointer-events: none !important;
+    max-width: 90vw !important;  /* 화면 너비에 맞게 조정 */
+    max-height: 90vh !important;  /* 화면 높이에 맞게 조정 */
+    overflow: visible !important;
+}
+
+.image-hover-tooltip img {
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    border: none !important;  /* 이미지 테두리 제거 */
+    border-radius: 0 !important;  /* 이미지 둥근 모서리 제거 */
+    display: block !important;
+    object-fit: contain !important;
+    box-shadow: none !important;  /* 이미지 그림자 제거 */
+}
+
+/* 호버 시 툴팁 표시 - 단순화 */
+.image-hover-container:hover .image-hover-tooltip {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+
+
+/* 버튼 호버 효과 */
+.image-hover-btn:hover {
+    background-color: #0d6efd !important;
+    color: white !important;
+    border-color: #0d6efd !important;
+    transform: scale(1.05) !important;
+}
+
+/* 디버깅용 - 툴팁 강제 표시 테스트 */
+.debug-tooltip-visible .image-hover-tooltip {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* 테이블 오버플로우 문제 해결 */
+.table-responsive {
+    overflow: visible !important;
+}
+
+.card-body {
+    overflow: visible !important;
+}
+</style>
 {% endblock %}

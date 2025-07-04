@@ -1,5 +1,6 @@
-from app.models.models import Receipt, ReceiptMatchLog, User, DutyFreeType, ShillaReceipt
+from app.models.models import Receipt, ReceiptMatchLog, User, DutyFreeType, ShillaReceipt, Passport
 from app.core.database import SessionLocal
+from app.utils.helpers import safe_float
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from datetime import datetime
@@ -48,8 +49,8 @@ def matchingResult(user_id):
             (receipt_number, is_matched, excel_name, passport_number, birthday,
              sales_date, categories, brands, product_count, total_discount_krw,
              total_sales_usd, total_net_sales_krw, store_branch) = row
-            
-            print(f"롯데 영수증: {receipt_number}, 매칭: {is_matched}, 이름: {excel_name}")
+
+            print(f"롯데 영수증: {receipt_number}, 매칭: {is_matched}, 최종 이름: {excel_name}")
             if is_matched:
                 print(f"  - 매출일자: {sales_date}")
                 print(f"  - 카테고리: {categories}")
@@ -74,23 +75,14 @@ def matchingResult(user_id):
                     print(f"날짜 파싱 오류: {sales_date} - {e}")
                     parsed_sales_date = None
             
-            # 숫자 변환 처리 함수
-            def safe_float(value):
-                if value is None:
-                    return None
-                try:
-                    if isinstance(value, str):
-                        value = value.replace(',', '').replace('￦', '').replace('$', '').strip()
-                    return float(value) if value != '' else None
-                except (ValueError, TypeError, AttributeError):
-                    return None
+            # safe_float 함수는 app.utils.helpers에서 import됨
             
-            # 영수증 단위 매칭 로그 생성
+            # 영수증 단위 매칭 로그 생성 (여권 풀네임 사용)
             match_log = ReceiptMatchLog(
                 user_id=user_id,
                 receipt_number=receipt_number,
                 is_matched=is_matched,
-                excel_name=excel_name,
+                excel_name=excel_name,  # 여권 풀네임 우선 사용
                 passport_number=passport_number,
                 birthday=birthday,
                 # 집계된 상세 정보
@@ -120,7 +112,7 @@ def matchingResult(user_id):
         AND p.user_id = :user_id
         AND e."receiptNumber" IN (
             SELECT rml.receipt_number 
-            FROM receipt_match_log rml 
+            FROM receipt_match_log rml
             WHERE rml.user_id = :user_id AND rml.is_matched = TRUE AND rml.duty_free_type = 'lotte'
         )
         """
@@ -135,8 +127,8 @@ def fetch_results(user_id, duty_free_type="lotte"):
     with SessionLocal() as db:
         if duty_free_type == "shilla":
             # 신라 면세점 결과 조회
-            from app.services.shilla_matching import fetch_shilla_results_with_receipt_ids
-            return fetch_shilla_results_with_receipt_ids(user_id)
+            from app.services.shilla_matching import fetch_shilla_results_with_details
+            return fetch_shilla_results_with_details(user_id)
         else:
             # 롯데 면세점 결과 조회
             # 사용자별 매칭된 영수증 번호 조회

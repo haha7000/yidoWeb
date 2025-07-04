@@ -380,7 +380,14 @@ document.addEventListener('DOMContentLoaded', function() {
 function getApiBaseUrl() {
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
-    return `${protocol}//${hostname}:8000`;
+    
+    // 개발 환경에서는 localhost, 프로덕션에서는 현재 호스트 사용
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return `${protocol}//localhost:8000`;
+    } else {
+        // AWS 환경에서는 현재 호스트의 8000 포트 사용
+        return `${protocol}//${hostname}:8000`;
+    }
 }
 
 // 드롭존 설정

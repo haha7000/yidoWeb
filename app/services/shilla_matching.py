@@ -2,6 +2,7 @@
 
 from app.models.models import ShillaReceipt, ReceiptMatchLog, Passport
 from app.core.database import SessionLocal
+from app.utils.helpers import safe_float
 from sqlalchemy.orm import Session
 from datetime import datetime
 from sqlalchemy import text
@@ -42,6 +43,20 @@ def shilla_matching_result(user_id):
         passport_updated2 = session.execute(text(sql_update_passport_from_receipt), {"user_id": user_id}).rowcount
         
         print(f"여권 매칭 상태 업데이트: 엑셀 {passport_updated1}개, 영수증 {passport_updated2}개")
+        
+        # 1.5단계: 영수증과 엑셀이 매칭될 때 엑셀 행에 여권번호 업데이트 (핵심 로직)
+        sql_update_excel_passport = """
+        UPDATE shilla_excel_data se
+        SET passport_number = sr.passport_number
+        FROM shilla_receipts sr
+        WHERE se."receiptNumber"::text = sr.receipt_number
+        AND sr.user_id = :user_id
+        AND sr.passport_number IS NOT NULL
+        AND sr.passport_number != ''
+        AND (se.passport_number IS NULL OR se.passport_number = '')
+        """
+        excel_passport_updated = session.execute(text(sql_update_excel_passport), {"user_id": user_id}).rowcount
+        print(f"🔗 엑셀 데이터에 여권번호 업데이트: {excel_passport_updated}개")
         
         # 2단계: 영수증 단위로 매칭 결과 조회 및 상품 정보 집계
         sql_matching = """
@@ -123,7 +138,9 @@ def shilla_matching_result(user_id):
             if sales_date:
                 try:
                     if isinstance(sales_date, str):
-                        parsed_sales_date = datetime.strptime(sales_date, '%Y-%m-%d').date()
+                        # 날짜 부분만 추출 (시간 부분 제거)
+                        date_part = sales_date.split()[0] if ' ' in sales_date else sales_date
+                        parsed_sales_date = datetime.strptime(date_part, '%Y-%m-%d').date()
                     elif hasattr(sales_date, 'date'):
                         parsed_sales_date = sales_date.date()
                     else:
@@ -132,37 +149,28 @@ def shilla_matching_result(user_id):
                     print(f"날짜 파싱 오류: {sales_date} - {e}")
                     parsed_sales_date = None
             
-            # 숫자 변환 처리 함수
-            def safe_float(value):
-                if value is None:
-                    return None
-                try:
-                    if isinstance(value, str):
-                        value = value.replace(',', '').replace('￦', '').replace('$', '').strip()
-                    return float(value) if value != '' else None
-                except (ValueError, TypeError, AttributeError):
-                    return None
+            # safe_float 함수는 app.utils.helpers에서 import됨
             
-            # 영수증 단위 매칭 로그 생성 (들여쓰기 수정)
-                match_log = ReceiptMatchLog(
-                    user_id=user_id,
-                    receipt_number=receipt_number,
-                    is_matched=is_matched,
-                    excel_name=final_excel_name,
-                    passport_number=final_passport_number,
-                    birthday=passport_birthday,
+            # 영수증 단위 매칭 로그 생성
+            match_log = ReceiptMatchLog(
+                user_id=user_id,
+                receipt_number=receipt_number,
+                is_matched=is_matched,
+                excel_name=final_excel_name,
+                passport_number=final_passport_number,
+                birthday=passport_birthday,
                 # 집계된 상세 정보
-                    sales_date=parsed_sales_date,
+                sales_date=parsed_sales_date,
                 category=categories,  # 모든 카테고리를 콤마로 구분
                 brand=brands,  # 모든 브랜드를 콤마로 구분
                 product_code=f"TOTAL_{product_count}_ITEMS",  # 상품 수 표시
                 discount_amount_krw=safe_float(total_discount_krw),
                 sales_price_usd=safe_float(total_sales_usd),
                 net_sales_krw=safe_float(total_net_sales_krw),
-                    store_branch=store_branch,
-                    duty_free_type="shilla"
-                )
-                session.add(match_log)
+                store_branch=store_branch,
+                duty_free_type="shilla"
+            )
+            session.add(match_log)
                 
             print(f"영수증 단위 매칭 로그 생성: {receipt_number} ({product_count}개 상품)")
 
@@ -263,155 +271,6 @@ def fetch_shilla_results(user_id):
         matched_list = list(customer_data.values())
         
         print(f"신라 매칭 결과 완료:")
-        print(f"  - 매칭된 고객: {len(matched_list)}명")
-        print(f"  - 매칭안된 영수증: {len(unmatched)}개")
-        
-        for customer in matched_list:
-            print(f"  - {customer['name']} ({customer['passport_match_status']}): {len(customer['receipt_numbers'])}건")
-        
-        return matched_list, unmatched
-
-
-def fetch_shilla_results_with_receipt_ids(user_id):
-    """
-    신라 면세점 결과 조회 - 영수증 ID도 포함하여 반환 (향상된 버전)
-    edit_unmatched에서 수정된 데이터도 반영, 데이터 정합성 문제 해결
-    """
-    with SessionLocal() as db:
-        print(f"신라 결과 조회 시작 (영수증 ID 포함, 향상된 버전) - 사용자 {user_id}")
-        
-        # 매칭된 영수증 정보 조회 - 중복 제거 및 정합성 개선
-        matched_sql = """
-        WITH receipt_passport_mapping AS (
-            -- 영수증별 여권번호 매핑 (우선순위: 영수증 여권번호 > 엑셀 여권번호)
-            SELECT 
-            sr.id as receipt_id,
-            sr.receipt_number,
-            sr.passport_number as receipt_passport_number,
-            se.passport_number as excel_passport_number,
-                se.name as excel_name,
-                se."PayBack" as payback_amount,
-                COALESCE(sr.passport_number, se.passport_number) as final_passport_number
-            FROM shilla_receipts sr
-            JOIN shilla_excel_data se ON se."receiptNumber"::text = sr.receipt_number
-            WHERE sr.user_id = :user_id
-        ),
-        passport_info AS (
-            -- 여권 정보 조회
-            SELECT 
-                rpm.*,
-            p.name as passport_name,
-            p.birthday as passport_birthday,
-            p.is_matched as passport_is_matched,
-            CASE 
-                WHEN p.passport_number IS NOT NULL AND p.is_matched = TRUE THEN 'passport_matched'
-                WHEN p.passport_number IS NOT NULL AND p.is_matched = FALSE THEN 'passport_needs_update'  
-                    WHEN p.passport_number IS NULL AND rpm.final_passport_number IS NOT NULL THEN 'passport_missing'
-                    WHEN p.passport_number IS NULL AND rpm.final_passport_number IS NULL THEN 'passport_not_provided'
-                ELSE 'passport_unknown'
-                END as passport_status
-            FROM receipt_passport_mapping rpm
-            LEFT JOIN passports p ON p.passport_number = rpm.final_passport_number 
-                               AND p.user_id = :user_id
-        )
-        SELECT 
-            receipt_id,
-            receipt_number,
-            excel_name,
-            receipt_passport_number,
-            excel_passport_number,
-            passport_name,
-            passport_birthday,
-            passport_is_matched,
-            passport_status,
-            COALESCE(passport_name, excel_name) as order_name,
-            payback_amount,
-            final_passport_number
-        FROM passport_info
-        ORDER BY order_name, receipt_number
-        """
-        matched = db.execute(text(matched_sql), {"user_id": user_id}).fetchall()
-        
-        # 매칭되지 않은 영수증 조회 (동일)
-        unmatched_sql = """
-        SELECT DISTINCT sr.*
-        FROM shilla_receipts sr
-        LEFT JOIN shilla_excel_data se ON se."receiptNumber"::text = sr.receipt_number
-        WHERE se."receiptNumber" IS NULL AND sr.user_id = :user_id
-        ORDER BY sr.receipt_number
-        """
-        unmatched = db.execute(text(unmatched_sql), {"user_id": user_id}).fetchall()
-        
-        # 매칭된 결과를 고객별로 그룹화 (정합성 개선)
-        customer_data = {}
-        receipt_id_mapping = {}
-        
-        for row in matched:
-            (receipt_id, receipt_number, excel_name, receipt_passport_number, 
-             excel_passport_number, passport_name, passport_birthday, 
-             passport_is_matched, passport_status, order_name, payback_amount,
-             final_passport_number) = row
-            
-            # 영수증 ID 매핑 저장
-            receipt_id_mapping[receipt_number] = receipt_id
-            
-            # 표시할 이름 결정: 여권 풀네임 우선, 없으면 엑셀 성씨
-            display_name = passport_name if passport_name else excel_name
-            
-            # 그룹화 키 결정 (정확한 매칭을 위해)
-            if final_passport_number:
-                group_key = f"passport_{final_passport_number}"
-            else:
-                # 여권번호가 없는 경우 엑셀 이름별로 그룹화
-                group_key = f"excel_{excel_name}"
-            
-            if group_key not in customer_data:
-                # 매칭 상태 판단 (정확한 로직)
-                if passport_status == 'passport_matched':
-                    match_status = '매칭됨'
-                    needs_update = False
-                elif passport_status == 'passport_needs_update':
-                    match_status = '여권번호 수정 필요'
-                    needs_update = True
-                elif passport_status == 'passport_missing':
-                    match_status = '여권 정보 없음'
-                    needs_update = True
-                elif passport_status == 'passport_not_provided':
-                    match_status = '여권 정보 없음'
-                    needs_update = True
-                else:
-                    match_status = '확인 필요'
-                    needs_update = True
-                
-                customer_data[group_key] = {
-                    'name': display_name,  # 여권 풀네임 우선
-                    'excel_name': excel_name,  # 엑셀 성씨
-                    'passport_name': passport_name,  # 여권 풀네임
-                    'receipt_numbers': [],
-                    'receipt_ids': [],  # 영수증 ID 목록
-                    'passport_number': final_passport_number,
-                    'birthday': passport_birthday,
-                    'needs_update': needs_update,
-                    'passport_match_status': match_status,
-                    'passport_status': passport_status,
-                    'payback_amount': payback_amount
-                }
-                
-                print(f"고객 그룹 생성: {group_key} -> {display_name} (상태: {match_status})")
-            
-            customer_data[group_key]['receipt_numbers'].append(receipt_number)
-            customer_data[group_key]['receipt_ids'].append(receipt_id)
-        
-        matched_list = list(customer_data.values())
-        
-        # 영수증 ID 매핑도 함께 반환
-        for customer in matched_list:
-            customer['receipt_id_mapping'] = {
-                receipt_num: receipt_id_mapping.get(receipt_num) 
-                for receipt_num in customer['receipt_numbers']
-            }
-        
-        print(f"신라 매칭 결과 완료 (향상된 버전):")
         print(f"  - 매칭된 고객: {len(matched_list)}명")
         print(f"  - 매칭안된 영수증: {len(unmatched)}개")
         

@@ -12,7 +12,7 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.core.database import SessionLocal
-from app.services.shilla_matching import shilla_matching_result, fetch_shilla_results_with_receipt_ids
+from app.services.shilla_matching import shilla_matching_result, fetch_shilla_results_with_details
 from app.models.models import User, ReceiptMatchLog
 from sqlalchemy import text
 
@@ -120,7 +120,7 @@ def show_results(user_id):
         # 결과 조회 테스트
         try:
             print(f"\n🔍 고객별 매칭 결과:")
-            matched_list, unmatched_list = fetch_shilla_results_with_receipt_ids(user_id)
+            matched_list, unmatched_list = fetch_shilla_results_with_details(user_id)
             
             print(f"  - 매칭된 고객: {len(matched_list)}명")
             print(f"  - 매칭안된 영수증: {len(unmatched_list)}개")
