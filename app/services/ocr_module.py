@@ -3,7 +3,6 @@ import platform
 
 # macOS Vision Framework 시도
 VISION_AVAILABLE = False
-TESSERACT_AVAILABLE = False
 
 if platform.system() == "Darwin":  # macOS
     try:
@@ -20,16 +19,6 @@ if platform.system() == "Darwin":  # macOS
     except ImportError as e:
         print(f"⚠️ macOS Vision 모듈 로드 실패: {e}")
 
-# Tesseract OCR 시도 (Linux/Windows/macOS 공통)
-try:
-    import pytesseract
-    from PIL import Image
-    import cv2
-    import numpy as np
-    TESSERACT_AVAILABLE = True
-    print("✅ Tesseract OCR 사용 가능")
-except ImportError as e:
-    print(f"⚠️ Tesseract 모듈 로드 실패: {e}")
 
 def VisionOcr(image_path):
     """크로스 플랫폼 OCR 함수"""
@@ -44,12 +33,8 @@ def VisionOcr(image_path):
     if VISION_AVAILABLE:
         return _vision_ocr_macos(image_path)
     
-    # Linux/Windows에서는 Tesseract 사용
-    elif TESSERACT_AVAILABLE:
-        return _tesseract_ocr(image_path)
-    
     else:
-        raise RuntimeError("OCR 프레임워크를 사용할 수 없습니다. macOS Vision 또는 Tesseract가 필요합니다.")
+        raise RuntimeError("OCR 프레임워크를 사용할 수 없습니다. macOS Vision이 필요합니다.")
 
 def _vision_ocr_macos(image_path):
     """macOS Vision Framework OCR"""
@@ -95,40 +80,6 @@ def _vision_ocr_macos(image_path):
         print("❌ OCR 오류:", error)
     return result_container.get("text", "")
 
-def _tesseract_ocr(image_path):
-    """Tesseract OCR (Linux/Windows/macOS 공통)"""
-    try:
-        # 이미지 전처리
-        image = cv2.imread(image_path)
-        if image is None:
-            raise ValueError(f"이미지를 로드할 수 없습니다: {image_path}")
-        
-        # 그레이스케일 변환
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # 노이즈 제거 및 대비 향상
-        gray = cv2.medianBlur(gray, 3)
-        gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-        
-        # PIL Image로 변환
-        pil_image = Image.fromarray(gray)
-        
-        # Tesseract 설정 (한글 + 영어)
-        custom_config = r'--oem 3 --psm 6 -l kor+eng'
-        
-        # OCR 실행
-        text = pytesseract.image_to_string(pil_image, config=custom_config)
-        
-        # 결과 정리
-        text = text.strip()
-        if not text:
-            print("⚠️ OCR에서 텍스트를 인식하지 못했습니다.")
-        
-        return text
-        
-    except Exception as e:
-        print(f"❌ Tesseract OCR 오류: {e}")
-        return ""
 
 # 호환성을 위한 별칭
 def VisionOcrMacOS(image_path):
@@ -138,12 +89,6 @@ def VisionOcrMacOS(image_path):
     else:
         raise RuntimeError("macOS Vision 프레임워크를 사용할 수 없습니다.")
 
-def TesseractOcr(image_path):
-    """Tesseract OCR 직접 호출"""
-    if TESSERACT_AVAILABLE:
-        return _tesseract_ocr(image_path)
-    else:
-        raise RuntimeError("Tesseract OCR을 사용할 수 없습니다.")
 
 # 사용 가능한 OCR 엔진 정보
 def get_available_ocr_engines():
@@ -151,8 +96,6 @@ def get_available_ocr_engines():
     engines = []
     if VISION_AVAILABLE:
         engines.append("macOS Vision Framework")
-    if TESSERACT_AVAILABLE:
-        engines.append("Tesseract OCR")
     return engines
 
 # 초기화 시 정보 출력
