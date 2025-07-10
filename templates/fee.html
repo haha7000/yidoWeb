@@ -852,9 +852,9 @@ function showQueryResultUI(data = sampleQueryData) {
 
 // 수수료 데이터 조회
 async function searchFeeData() {
-    const date = document.getElementById('searchDate').value;
-    const store = document.getElementById('dutyFreeStore').value;
-    const branch = document.getElementById('branch').value;
+    const date = document.getElementById('searchDate').value; // 조회 날짜
+    const store = document.getElementById('dutyFreeStore').value; // 면세점명
+    const branch = document.getElementById('branch').value; // 지점명
     
     if (!date) {
         showNotification('조회 날짜를 선택해주세요.', 'warning');
@@ -912,7 +912,7 @@ async function searchFeeData() {
                 discountRate: (apiData.settings.free_rate_threshold * 100).toFixed(1),
                 categoryFees: apiData.category_fees ? apiData.category_fees.map(fee => ({
                     id: fee.id,
-                    feeType: fee.fee_type, // 새로운 구조: fee_type 사용
+                    feeType: fee.fee_type,
                     feeRate: (fee.commission_rate * 100).toFixed(2) + '%'
                 })) : [],
                 brandFees: apiData.brand_fees ? apiData.brand_fees.map(fee => ({
