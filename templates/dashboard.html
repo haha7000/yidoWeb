@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}대시보드{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">대시보드</h2>
+
+    <!-- 통계 카드 -->
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary mb-3">
+                <div class="card-header">총 영수증</div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ stats.total_receipts }}</h5>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success mb-3">
+                <div class="card-header">매칭된 영수증</div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ stats.matched_receipts }}</h5>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info mb-3">
+                <div class="card-header">매칭률</div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ "%.1f"|format(stats.match_rate) }}%</h5>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning mb-3">
+                <div class="card-header">총 수수료 (계산된)</div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ stats.total_commission | round(0) | int }}원</h5>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 차트 -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">면세점별 처리 비율</h5>
+                    <canvas id="dutyFreeChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">월별 처리 현황 (미구현)</h5>
+                    <canvas id="monthlyTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // 면세점별 처리 비율 차트
+    const ctx = document.getElementById('dutyFreeChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['롯데', '신라'],
+            datasets: [{
+                label: '영수증 수',
+                data: [{{ stats.lotte_receipts }}, {{ stats.shilla_receipts }}],
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.7)',
+                    'rgba(54, 162, 235, 0.7)'
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: true,
+                    text: '면세점별 영수증 처리 비율'
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
