@@ -112,24 +112,26 @@ class CommissionService:
             brand=brand,
             product_code=product_code,
             duty_free_type=duty_free_type,
-            discount_rate=discount_rate  # 할인율 전달 추가
+            discount_rate=discount_rate
         )
         
         if commission_rate is not None and net_sales_krw:
             commission_fee = float(net_sales_krw) * float(commission_rate)
             commission_fee = round(commission_fee, 2)
         
-        # 3. 데이터베이스 업데이트
+        # 3. 데이터베이스 업데이트 (commission_rate도 함께 저장)
         update_sql = """
         UPDATE receipt_match_log 
         SET discount_rate = :discount_rate,
-            commission_fee = :commission_fee
+            commission_fee = :commission_fee,
+            commission_rate = :commission_rate
         WHERE id = :record_id
         """
         
         self.session.execute(text(update_sql), {
             "discount_rate": discount_rate,
             "commission_fee": commission_fee,
+            "commission_rate": commission_rate,
             "record_id": record_id
         })
         
@@ -158,13 +160,14 @@ class CommissionService:
             return None
         
         # fee_settings에서 해당 면세점, 지점, 날짜에 맞는 설정 조회
+        # 최근 업로드된 설정을 우선으로 조회 (created_at DESC)
         settings_query = """
         SELECT id, free_rate_threshold 
         FROM fee_settings 
         WHERE company_name = :company_name
         AND branch_name = :branch_name
         AND :sales_date BETWEEN effective_from AND COALESCE(effective_to, '2099-12-31')
-        ORDER BY effective_from DESC
+        ORDER BY created_at DESC, effective_from DESC
         LIMIT 1
         """
         
