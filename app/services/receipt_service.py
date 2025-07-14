@@ -38,7 +38,8 @@ class ReceiptService:
             temp_dir = tempfile.mkdtemp()
             receipt_path = os.path.join(temp_dir, f"{customer_name}의 수령증.xlsx")
             
-            # 수령증 생성
+            # 수령증 생성 (user_id 추가)
+            customer_data['user_id'] = user_id
             success = self._create_receipt_file(customer_data, receipt_path)
             
             db.close()
@@ -71,6 +72,8 @@ class ReceiptService:
             for customer_data in customers_data:
                 customer_name = customer_data['excel_name']
                 if customer_name:
+                    # user_id 추가
+                    customer_data['user_id'] = user_id
                     receipt_file = os.path.join(temp_dir, f"{customer_name}의 수령증.xlsx")
                     if self._create_receipt_file(customer_data, receipt_file):
                         receipt_files.append(receipt_file)
@@ -111,6 +114,8 @@ class ReceiptService:
             for customer_data in customers_data:
                 customer_name = customer_data['excel_name']
                 if customer_name:
+                    # user_id 추가
+                    customer_data['user_id'] = user_id
                     receipt_file = os.path.join(temp_dir, f"{customer_name}의 수령증.xlsx")
                     if self._create_receipt_file(customer_data, receipt_file):
                         receipt_files.append(receipt_file)
@@ -288,6 +293,11 @@ class ReceiptService:
             receiver_str = f"수령자(收款人签字）：    {customer_name}    （인)"
             worksheet['B19'] = receiver_str
             
+            # "매출내역" 시트에 excel_data 추가
+            print(f"🔍 매출내역 시트 생성 시작 - 고객: {customer_data.get('excel_name')}")
+            sales_success = self._populate_sales_details_sheet(workbook, customer_data)
+            print(f"📊 매출내역 시트 생성 결과: {sales_success}")
+            
             # 파일 저장
             workbook.save(output_path)
             workbook.close()
@@ -298,6 +308,260 @@ class ReceiptService:
         except Exception as e:
             print(f"수령증 파일 생성 오류: {e}")
             return False
+    
+    def _populate_sales_details_sheet(self, workbook, customer_data: Dict) -> bool:
+        """매출내역 시트에 excel_data 정보 추가"""
+        try:
+            print(f"📋 매출내역 시트 처리 시작")
+            print(f"🧾 고객 데이터: {customer_data}")
+            
+            # "매출내역" 시트가 있는지 확인, 없으면 생성
+            if "매출내역" not in workbook.sheetnames:
+                print("📄 매출내역 시트 새로 생성")
+                sales_sheet = workbook.create_sheet("매출내역")
+            else:
+                print("📄 기존 매출내역 시트 사용")
+                sales_sheet = workbook["매출내역"]
+            
+            # 기존 데이터 모두 삭제 (헤더도 포함)
+            if sales_sheet.max_row > 0:
+                sales_sheet.delete_rows(1, sales_sheet.max_row)
+                print(f"🗑️ 기존 데이터 삭제 완료")
+            
+            # 데이터베이스에서 해당 고객의 매출 데이터 조회
+            print("🔍 매출 데이터 조회 시작")
+            sales_data = self._get_customer_sales_data(customer_data)
+            print(f"📊 조회된 매출 데이터 개수: {len(sales_data) if sales_data else 0}")
+            
+            if not sales_data:
+                print("❌ 매출 데이터가 없습니다.")
+                # 빈 시트라도 헤더는 추가
+                sales_sheet.cell(row=1, column=1, value="매출 데이터가 없습니다")
+                return False
+            
+            # 헤더와 데이터 추가
+            if sales_data:
+                # 첫 번째 행에 헤더 추가
+                headers = list(sales_data[0].keys())
+                print(f"📝 헤더: {headers}")
+                for col_idx, header in enumerate(headers, 1):
+                    sales_sheet.cell(row=1, column=col_idx, value=header)
+                
+                # 데이터 행들 추가
+                for row_idx, row_data in enumerate(sales_data, 2):
+                    for col_idx, value in enumerate(row_data.values(), 1):
+                        sales_sheet.cell(row=row_idx, column=col_idx, value=value)
+                
+                print(f"✅ 매출내역 시트에 헤더 1개 + 데이터 {len(sales_data)}개 행 추가 완료")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ 매출내역 시트 생성 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def _get_customer_sales_data(self, customer_data: Dict) -> List[Dict]:
+        """고객의 매출 데이터 조회 (processing_history + excel_data)"""
+        try:
+            print(f"🔍 _get_customer_sales_data 시작")
+            db = SessionLocal()
+            duty_free_type = customer_data.get('duty_free_type', 'lotte')
+            customer_name = customer_data.get('excel_name', '')
+            
+            print(f"🏪 면세점 타입: {duty_free_type}")
+            print(f"👤 고객명: {customer_name}")
+            
+            # customer_data에서 user_id 가져오기
+            user_id = customer_data.get('user_id')
+            if not user_id:
+                print("❌ user_id가 제공되지 않았습니다.")
+                db.close()
+                return []
+            
+            print(f"🆔 사용자 ID: {user_id}")
+            
+            # 현재 세션 또는 processing_history에서 해당 고객의 영수증 번호들과 실제 이름 조회
+            # 먼저 receipt_match_log에서 조회 시도
+            receipt_query = text("""
+                SELECT DISTINCT 
+                    rml.receipt_number,
+                    COALESCE(ph.excel_name, rml.excel_name) as actual_name
+                FROM receipt_match_log rml
+                LEFT JOIN processing_history ph ON rml.receipt_number = ph.receipt_number 
+                    AND rml.user_id = ph.user_id
+                WHERE rml.excel_name = :customer_name
+                AND rml.user_id = :user_id
+                AND rml.is_matched = true
+                AND rml.receipt_number IS NOT NULL
+            """)
+            
+            print(f"🔍 영수증 번호 조회 쿼리 실행 중...")
+            receipt_results = db.execute(receipt_query, {
+                "customer_name": customer_name,
+                "user_id": user_id
+            }).fetchall()
+            
+            print(f"📋 조회된 영수증 결과 개수: {len(receipt_results)}")
+            
+            if not receipt_results:
+                print(f"❌ receipt_match_log에서 해당 고객을 찾을 수 없음: {customer_name}")
+                print(f"🔄 processing_history에서 재시도...")
+                
+                # processing_history에서 직접 조회 (fallback)
+                history_query = text("""
+                    SELECT DISTINCT 
+                        receipt_number,
+                        excel_name as actual_name
+                    FROM processing_history 
+                    WHERE excel_name = :customer_name
+                    AND user_id = :user_id
+                    AND is_matched = true
+                    AND receipt_number IS NOT NULL
+                """)
+                
+                receipt_results = db.execute(history_query, {
+                    "customer_name": customer_name,
+                    "user_id": user_id
+                }).fetchall()
+                
+                print(f"📋 processing_history에서 조회된 결과: {len(receipt_results)}개")
+                
+                if not receipt_results:
+                    print(f"❌ processing_history에서도 해당 고객을 찾을 수 없음: {customer_name}")
+                    
+                    # 디버깅용 쿼리
+                    debug_query = text("""
+                        SELECT excel_name, is_matched, receipt_number, user_id
+                        FROM processing_history 
+                        WHERE user_id = :user_id 
+                        LIMIT 10
+                    """)
+                    debug_results = db.execute(debug_query, {"user_id": user_id}).fetchall()
+                    print(f"🔍 processing_history 샘플 데이터: {[dict(row._mapping) for row in debug_results]}")
+                    
+                    db.close()
+                    return []
+            
+            # 영수증 번호들 수집
+            receipt_numbers = [row.receipt_number for row in receipt_results]
+            actual_name = receipt_results[0].actual_name if receipt_results else customer_name
+            
+            print(f"🧾 고객 '{customer_name}' (실제명: '{actual_name}')의 영수증 번호들: {receipt_numbers}")
+            print(f"📝 영수증 개수: {len(receipt_numbers)}")
+            
+            # duty_free_type이 None인 경우 자동 감지
+            if not duty_free_type:
+                print("🔍 duty_free_type이 None이므로 자동 감지 시도")
+                duty_free_type = self._detect_duty_free_type_by_user(user_id)
+                print(f"🏪 자동 감지된 면세점 타입: {duty_free_type}")
+            
+            # 면세점별로 다른 테이블에서 데이터 조회
+            if duty_free_type and duty_free_type.lower() == 'shilla':
+                print("🏪 신라 면세점 데이터 조회 시작")
+                excel_table = "shilla_excel_data"
+                receipt_number_column = '"receiptNumber"'
+                
+                # 신라는 이름이 잘리므로 영수증 번호로만 조회하고 나중에 이름을 보정
+                if receipt_numbers:
+                    # PostgreSQL의 ANY 연산자 대신 IN 절 사용
+                    placeholders = ','.join([f"'{num}'" for num in receipt_numbers])
+                    query_str = f"""
+                        SELECT *
+                        FROM {excel_table}
+                        WHERE {receipt_number_column}::text IN ({placeholders})
+                        ORDER BY {receipt_number_column}, "상품코드"
+                    """
+                    print(f"🔍 신라 쿼리: {query_str}")
+                    query = text(query_str)
+                    
+                    results = db.execute(query).fetchall()
+                    print(f"📊 신라 조회 결과: {len(results)}개")
+                else:
+                    print("❌ 영수증 번호가 없음")
+                    results = []
+                
+            elif duty_free_type and duty_free_type.lower() == 'lotte':
+                print("🏪 롯데 면세점 데이터 조회 시작")
+                excel_table = "lotte_excel_data"
+                receipt_number_column = '"receiptNumber"'
+                name_column = 'name'
+                
+                if receipt_numbers:
+                    # PostgreSQL의 ANY 연산자 대신 IN 절 사용
+                    placeholders = ','.join([f"'{num}'" for num in receipt_numbers])
+                    query_str = f"""
+                        SELECT *
+                        FROM {excel_table}
+                        WHERE {receipt_number_column} IN ({placeholders})
+                        AND {name_column} = :customer_name
+                        ORDER BY {receipt_number_column}, "상품코드"
+                    """
+                    print(f"🔍 롯데 쿼리: {query_str}")
+                    print(f"👤 검색할 고객명: {actual_name}")
+                    query = text(query_str)
+                    
+                    results = db.execute(query, {
+                        "customer_name": actual_name
+                    }).fetchall()
+                    print(f"📊 롯데 조회 결과: {len(results)}개")
+                else:
+                    print("❌ 영수증 번호가 없음")
+                    results = []
+            
+            else:
+                print(f"❌ 알 수 없는 면세점 타입: {duty_free_type}")
+                results = []
+            
+            if not results:
+                print(f"❌ excel_data에서 해당 고객의 매출 데이터를 찾을 수 없습니다: {actual_name}")
+                
+                # 디버깅용: excel_data 테이블에 실제로 데이터가 있는지 확인
+                if duty_free_type.lower() == 'shilla':
+                    debug_query = text("SELECT COUNT(*) FROM shilla_excel_data LIMIT 1")
+                else:
+                    debug_query = text("SELECT COUNT(*) FROM lotte_excel_data LIMIT 1")
+                
+                try:
+                    count = db.execute(debug_query).scalar()
+                    print(f"🔍 {excel_table} 테이블 총 레코드 수: {count}")
+                except Exception as e:
+                    print(f"❌ {excel_table} 테이블 존재하지 않음 또는 오류: {e}")
+                
+                db.close()
+                return []
+            
+            # 결과를 딕셔너리 리스트로 변환 (PayBack 컬럼 제외)
+            print(f"📋 결과 변환 시작, 원본 데이터 {len(results)}개")
+            sales_data = []
+            for i, row in enumerate(results):
+                row_dict = {}
+                # SQLAlchemy Row 객체를 딕셔너리로 변환
+                row_mapping = dict(row._mapping)
+                
+                for column, value in row_mapping.items():
+                    if column.lower() != 'payback':  # PayBack 컬럼 제외
+                        # 신라의 경우 name 컬럼을 실제 이름으로 보정
+                        if duty_free_type.lower() == 'shilla' and column.lower() == 'name':
+                            row_dict[column] = actual_name
+                        else:
+                            row_dict[column] = value
+                sales_data.append(row_dict)
+                
+                # 첫 번째 행만 로그 출력
+                if i == 0:
+                    print(f"📝 첫 번째 행 샘플 (처음 5개 컬럼): {dict(list(row_dict.items())[:5])}")
+            
+            db.close()
+            print(f"✅ 매출 데이터 {len(sales_data)}건 변환 완료")
+            return sales_data
+            
+        except Exception as e:
+            print(f"고객 매출 데이터 조회 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
     
     def _get_current_session_customers_data(self, db: Session, user_id: int) -> List[Dict]:
         """현재 활성 세션의 모든 고객 데이터 조회 - receipt_match_log 기반"""
@@ -340,7 +604,7 @@ class ReceiptService:
                     'passport_number': result.passport_number,
                     'birthday': result.birthday,
                     'commission_total': commission_total,
-                    'duty_free_type': result.duty_free_type
+                    'duty_free_type': duty_free_type  # 감지된 duty_free_type 사용
                 })
                 
                 if result.passport_full_name:
@@ -385,6 +649,21 @@ class ReceiptService:
             # 신라 데이터가 있는지 확인
             shilla_count = db.execute(text("SELECT COUNT(*) FROM shilla_receipts WHERE user_id = :user_id"), 
                                      {"user_id": user_id}).scalar()
+            if shilla_count > 0:
+                return "shilla"
+            else:
+                return "lotte"
+        except:
+            return "lotte"  # 기본값
+    
+    def _detect_duty_free_type_by_user(self, user_id: int) -> str:
+        """사용자의 면세점 타입 감지 (DB 연결 없이)"""
+        try:
+            db = SessionLocal()
+            # 신라 데이터가 있는지 확인
+            shilla_count = db.execute(text("SELECT COUNT(*) FROM shilla_receipts WHERE user_id = :user_id"), 
+                                     {"user_id": user_id}).scalar()
+            db.close()
             if shilla_count > 0:
                 return "shilla"
             else:
