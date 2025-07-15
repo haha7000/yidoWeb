@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Request, HTTPException, Form, Depends
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 import os, shutil
 from app.core.database import SessionLocal
 from app.models.models import User, Receipt, Passport, ReceiptMatchLog, ShillaReceipt
 from app.services.receipt_service import ReceiptService
+from app.services.commission_service import calculate_discounts_and_commissions
 from app.utils.helpers import safe_float
 from datetime import datetime
 from sqlalchemy.sql import text
@@ -211,6 +212,7 @@ async def update_unmatched(
                     match_log.sales_price_usd = safe_float(result[8])  # sales_price_usd
                     match_log.net_sales_krw = safe_float(result[9])  # net_sales_krw
                     match_log.store_branch = result[10]  # store_branch
+                    match_log.duty_free_type = "lotte"  # 롯데 면세점 명시
             else:
                 # 새 로그 생성 시에도 상세 정보 포함
                 passport_info = None
@@ -251,14 +253,24 @@ async def update_unmatched(
                     discount_amount_krw=safe_float(result[7]) if result else None,
                     sales_price_usd=safe_float(result[8]) if result else None,
                     net_sales_krw=safe_float(result[9]) if result else None,
-                    store_branch=result[10] if result else None
+                    store_branch=result[10] if result else None,
+                    duty_free_type="lotte"  # 롯데 면세점 명시
                 )
                 db.add(new_match_log)
                     
             db.commit()
             
-            # 매칭 성공 여부 확인
+            # 매칭 성공 시 자동으로 할인율 수수료 계산
             is_matched = result is not None
+            if is_matched:
+                try:
+                    commission_result = calculate_discounts_and_commissions(user_id=current_user.id)
+                    if commission_result["success"]:
+                        print(f"할인율 수수료 자동 계산 완료: {commission_result['processed_count']}개 처리")
+                    else:
+                        print(f"할인율 수수료 자동 계산 실패: {commission_result['message']}")
+                except Exception as e:
+                    print(f"할인율 수수료 자동 계산 중 오류: {e}")
             
             # 다음 매칭되지 않은 영수증 찾기
             unmatched_sql = text("""
@@ -380,6 +392,7 @@ async def update_unmatched(
                 match_log.sales_price_usd = safe_float(excel_result[8])  # sales_price_usd
                 match_log.net_sales_krw = safe_float(excel_result[9])  # net_sales_krw
                 match_log.store_branch = excel_result[10]  # store_branch
+                match_log.duty_free_type = "shilla"  # 신라 면세점 명시
         else:
             # 새 로그 생성 (상세 정보 포함)
             # 날짜 변환 처리
@@ -413,7 +426,8 @@ async def update_unmatched(
                 discount_amount_krw=safe_float(excel_result[7]) if excel_result else None,
                 sales_price_usd=safe_float(excel_result[8]) if excel_result else None,
                 net_sales_krw=safe_float(excel_result[9]) if excel_result else None,
-                store_branch=excel_result[10] if excel_result else None
+                store_branch=excel_result[10] if excel_result else None,
+                duty_free_type="shilla"  # 신라 면세점 명시
             )
             db.add(new_match_log)
         
@@ -440,8 +454,17 @@ async def update_unmatched(
         print(f"  - 여권번호: {old_passport_number} -> {passport_number}")
         print(f"  - 엑셀 매칭: {'성공' if excel_result else '실패'}")
         
-        # 매칭 성공 여부 확인
+        # 매칭 성공 시 자동으로 할인율 수수료 계산
         is_matched = excel_result is not None
+        if is_matched:
+            try:
+                commission_result = calculate_discounts_and_commissions(user_id=current_user.id)
+                if commission_result["success"]:
+                    print(f"할인율 수수료 자동 계산 완료: {commission_result['processed_count']}개 처리")
+                else:
+                    print(f"할인율 수수료 자동 계산 실패: {commission_result['message']}")
+            except Exception as e:
+                print(f"할인율 수수료 자동 계산 중 오류: {e}")
         
         # 다음 매칭되지 않은 신라 영수증 찾기
         next_unmatched_sql = text("""

@@ -544,21 +544,23 @@ function setupFormSubmission() {
                 if (result.success) {
                     if (result.matched) {
                         // 매칭 성공 - 다음 영수증으로 이동
-                        showSuccess('매칭 완료');
-                        
-                        if (result.has_more && result.next_receipt) {
-                            setTimeout(() => {
-                                window.location.href = `/edit_unmatched/${result.next_receipt.id}`;
-                            }, 1000);
-                        } else {
-                            setTimeout(() => {
-                                window.location.href = '/result/';
-                            }, 2000);
-                        }
+                        showSuccess('매칭 완료! 다음 영수증으로 이동합니다...');
                     } else {
-                        // 매칭 실패 - 같은 페이지에 머물면서 오류 메시지 표시
-                        showError('매칭 실패');
-                        receiptInput.classList.add('input-error');
+                        // 매칭 실패 - 다음 영수증으로 이동
+                        showSuccess('저장 완료! 다음 영수증으로 이동합니다...');
+                    }
+                    
+                    // 매칭 성공/실패 여부와 관계없이 다음으로 이동
+                    if (result.has_more && result.next_receipt) {
+                        setTimeout(() => {
+                            window.location.href = `/edit_unmatched/${result.next_receipt.id}`;
+                        }, 1000);
+                    } else {
+                        // 모든 영수증 처리 완료
+                        showSuccess('모든 영수증 처리가 완료되었습니다!');
+                        setTimeout(() => {
+                            window.location.href = '/result/';
+                        }, 2000);
                     }
                 } else {
                     showError('저장 중 오류가 발생했습니다.');
