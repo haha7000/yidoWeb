@@ -383,7 +383,7 @@ function getApiBaseUrl() {
     
     // 개발 환경에서는 localhost, 프로덕션에서는 현재 호스트 사용
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return `${protocol}//localhost:8000`;
+        return `${protocol}//localhost:8003`;
     } else {
         // AWS 환경에서는 현재 호스트의 8000 포트 사용
         return `${protocol}//${hostname}:8000`;

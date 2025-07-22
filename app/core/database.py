@@ -1,11 +1,13 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+import os
 
-user = 'test_user'
-password = '0000'
-host = 'localhost'
-port = '5432'
-database = 'my_test_db'
+# 환경변수에서 데이터베이스 정보 가져오기
+user = os.getenv('DB_USER', 'test_user')
+password = os.getenv('DB_PASSWORD', '0000')
+host = os.getenv('DB_HOST', 'localhost')
+port = os.getenv('DB_PORT', '5432')
+database = os.getenv('DB_NAME', 'my_test_db')
 
 SQLALCHEMY_DATABASE_URL = f'postgresql://{user}:{password}@{host}:{port}/{database}'
 my_engine = create_engine(SQLALCHEMY_DATABASE_URL)

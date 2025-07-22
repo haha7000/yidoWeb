@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, HTTPException, Form, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import JSONResponse, RedirectResponse
 from app.core.database import SessionLocal
-from app.models.models import User, Receipt, Passport, ReceiptMatchLog, ShillaReceipt, ProcessingHistory
+from app.models.models import User, Receipt, Passport, ReceiptMatchLog, ShillaReceipt, ProcessingHistory, PassportArchive
 from datetime import datetime
 from sqlalchemy.sql import text
 from sqlalchemy.orm import Session
@@ -110,18 +110,48 @@ async def complete_session(
         # 4. 현재 세션 데이터 초기화
         print("현재 세션 데이터 초기화...")
         
-        # receipt_match_log 테이블 초기화
+        # 4-1. 여권 데이터를 아카이브로 복사
+        print("여권 데이터 아카이브 저장 시작...")
+        passports_to_archive = db.query(Passport).filter(
+            Passport.user_id == current_user.id
+        ).all()
+        
+        archived_passport_count = 0
+        for passport in passports_to_archive:
+            try:
+                archived_passport = PassportArchive(
+                    user_id=passport.user_id,
+                    upload_id=passport.upload_id,
+                    session_name=final_session_name,
+                    original_passport_id=passport.id,
+                    file_path=passport.file_path,
+                    passport_number=passport.passport_number,
+                    birthday=passport.birthday,
+                    name=passport.name,
+                    is_matched=passport.is_matched,
+                    original_created_at=passport.created_at
+                )
+                db.add(archived_passport)
+                archived_passport_count += 1
+                print(f"여권 아카이브 저장: {passport.passport_number}")
+            except Exception as archive_error:
+                print(f"여권 아카이브 저장 오류: {archive_error}")
+                
+        print(f"여권 아카이브 {archived_passport_count}개 저장 완료")
+        
+        # 4-2. receipt_match_log 테이블 초기화
         deleted_count = db.query(ReceiptMatchLog).filter(
             ReceiptMatchLog.user_id == current_user.id
         ).delete()
         print(f"receipt_match_log {deleted_count}개 삭제")
         
-        # 다른 테이블들도 초기화
+        # 4-3. 다른 테이블들도 초기화
         receipt_deleted = db.query(Receipt).filter(Receipt.user_id == current_user.id).delete()
         shilla_deleted = db.query(ShillaReceipt).filter(ShillaReceipt.user_id == current_user.id).delete()
         passport_deleted = db.query(Passport).filter(Passport.user_id == current_user.id).delete()
         
         print(f"기타 테이블 삭제: receipts={receipt_deleted}, shilla_receipts={shilla_deleted}, passports={passport_deleted}")
+        print(f"아카이브된 여권: {archived_passport_count}개")
         
         # 엑셀 데이터 테이블은 보존 (다른 사용자도 사용할 수 있으므로)
         # 엑셀 데이터는 업로드 시마다 새로 생성되므로 삭제하지 않음

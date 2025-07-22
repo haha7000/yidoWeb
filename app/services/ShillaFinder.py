@@ -3,6 +3,7 @@ from app.services.ocr_module import VisionOcr
 from app.models.models import ShillaReceipt, Passport, UnrecognizedImage
 from app.core.database import SessionLocal
 import json
+import requests
 from datetime import datetime
 
 def parse_and_validate_date(date_string):
@@ -64,7 +65,9 @@ def parse_and_validate_date(date_string):
 def ShillaAiOcr(imagePath, user_id):
     db = SessionLocal()
     try:
-        # OCR 및 GPT 처리
+        # response = requests.post("http://localhost:9000/ocr", files={"file": open(imagePath, "rb")})
+        # ocrResult = response.json()
+        # ocrResult = ocrResult['text']
         ocrResult = VisionOcr(imagePath)
         result = ShillaClassificationUseGpt(ocrResult)
 

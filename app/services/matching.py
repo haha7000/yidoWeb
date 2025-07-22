@@ -21,9 +21,21 @@ def matchingResult(user_id):
         STRING_AGG(DISTINCT e."카테고리", ', ') as categories,
         STRING_AGG(DISTINCT e."브랜드", ', ') as brands,
         COUNT(e."상품코드") as product_count,
-        SUM(COALESCE(e."할인액(\)", 0)) as total_discount_krw,
-        SUM(COALESCE(e."판매가($)", 0)) as total_sales_usd,
-        SUM(COALESCE(e."순매출액(\)", 0)) as total_net_sales_krw,
+        SUM(CASE 
+            WHEN e."할인액(\)" IS NOT NULL AND e."할인액(\)" != 0
+            THEN e."할인액(\)"
+            ELSE 0
+        END) as total_discount_krw,
+        SUM(CASE 
+            WHEN e."판매가($)" IS NOT NULL AND e."판매가($)" != 0
+            THEN e."판매가($)"
+            ELSE 0
+        END) as total_sales_usd,
+        SUM(CASE 
+            WHEN e."순매출액(\)" IS NOT NULL AND e."순매출액(\)" != 0
+            THEN e."순매출액(\)"
+            ELSE 0
+        END) as total_net_sales_krw,
         MIN(e."점구분") as store_branch
     FROM receipts r
     LEFT JOIN lotte_excel_data e ON r.receipt_number = e."receiptNumber"
