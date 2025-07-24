@@ -11,7 +11,7 @@ def matchingResult(user_id):
     # 영수증 단위로 매칭 결과 조회 및 상품 정보 집계
     sql = """
     SELECT 
-        r.receipt_number,
+        unique_receipts.receipt_number,
         BOOL_OR(e."receiptNumber" IS NOT NULL) AS is_matched,
         MAX(e.name) as excel_name,
         MAX(p.passport_number) as passport_number,
@@ -37,29 +37,56 @@ def matchingResult(user_id):
             ELSE 0
         END) as total_net_sales_krw,
         MIN(e."점구분") as store_branch
-    FROM receipts r
-    LEFT JOIN lotte_excel_data e ON r.receipt_number = e."receiptNumber"
+    FROM (
+        SELECT DISTINCT receipt_number 
+        FROM receipts 
+        WHERE user_id = :user_id 
+          AND receipt_number IS NOT NULL
+    ) unique_receipts
+    LEFT JOIN lotte_excel_data e ON unique_receipts.receipt_number = e."receiptNumber"
     LEFT JOIN passports p ON e.name = p.name AND p.user_id = :user_id
-    WHERE r.user_id = :user_id
-    GROUP BY r.receipt_number
-    ORDER BY r.receipt_number
+    GROUP BY unique_receipts.receipt_number
+    ORDER BY unique_receipts.receipt_number
     """
 
     with SessionLocal() as session:
         results = session.execute(text(sql), {"user_id": user_id}).fetchall()
         print(f"롯데 매칭 처리할 영수증: {len(results)}개")
 
-        # 1단계: 선택적 업데이트를 위한 기존 로그 조회
-        existing_logs = {}
+        # 1단계: 중복 로그 정리 후 기존 로그 조회
         existing_logs_query = session.query(ReceiptMatchLog).filter(
             ReceiptMatchLog.user_id == user_id,
             ReceiptMatchLog.duty_free_type == "lotte"
         ).all()
         
+        # 중복 로그 감지 및 정리
+        receipt_log_groups = {}
         for log in existing_logs_query:
-            existing_logs[log.receipt_number] = log
+            if log.receipt_number not in receipt_log_groups:
+                receipt_log_groups[log.receipt_number] = []
+            receipt_log_groups[log.receipt_number].append(log)
         
-        print(f"기존 롯데 매칭 로그: {len(existing_logs)}개")
+        # 중복 로그 제거 (가장 최근 것만 유지)
+        existing_logs = {}
+        duplicates_removed = 0
+        for receipt_number, logs in receipt_log_groups.items():
+            if len(logs) > 1:
+                # 가장 최근 로그 유지, 나머지 삭제
+                logs.sort(key=lambda x: x.checked_at or datetime.min, reverse=True)
+                keep_log = logs[0]
+                for duplicate_log in logs[1:]:
+                    session.delete(duplicate_log)
+                    duplicates_removed += 1
+                existing_logs[receipt_number] = keep_log
+                print(f"🗑️ 중복 로그 정리: {receipt_number} ({len(logs)-1}개 삭제)")
+            else:
+                existing_logs[receipt_number] = logs[0]
+        
+        if duplicates_removed > 0:
+            session.commit()
+            print(f"🔧 중복 로그 정리 완료: {duplicates_removed}개 삭제")
+        
+        print(f"기존 롯데 매칭 로그: {len(existing_logs)}개 (중복 제거 후)")
 
         # 2단계: 영수증 단위 매칭 로그 업데이트/생성 (선택적 처리)
         processed_receipts = set()
