@@ -65,7 +65,7 @@ def parse_and_validate_date(date_string):
 def ShillaAiOcr(imagePath, user_id):
     db = SessionLocal()
     try:
-        # response = requests.post("http://localhost:9000/ocr", files={"file": open(imagePath, "rb")})
+        # response = requests.post("http://host.docker.internal:9000/ocr", files={"file": open(imagePath, "rb")})
         # ocrResult = response.json()
         # ocrResult = ocrResult['text']
         ocrResult = VisionOcr(imagePath)

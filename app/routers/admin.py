@@ -8,7 +8,7 @@ from app.core.database import SessionLocal
 from app.models.models import User, Receipt, Passport, ReceiptMatchLog, ShillaReceipt, UnrecognizedImage
 from app.services.receipt_service import ReceiptService
 from datetime import datetime
-from sqlalchemy.sql import text
+from sqlalchemy.sql import text as sql_text
 from sqlalchemy.orm import Session
 from app.core.auth import get_current_user, get_db
 from app.core.config import settings
@@ -28,7 +28,7 @@ async def get_result(
         
         # 먼저 신라 데이터가 있는지 확인
         try:
-            shilla_count_sql = text("""
+            shilla_count_sql = sql_text("""
                 SELECT COUNT(*) FROM shilla_receipts 
                 WHERE user_id = :user_id
             """)
@@ -39,7 +39,7 @@ async def get_result(
                 print(f"신라 영수증 {shilla_count}개 발견, 신라 모드로 설정")
             else:
                 # 롯데 데이터 확인
-                lotte_count_sql = text("""
+                lotte_count_sql = sql_text("""
                     SELECT COUNT(*) FROM receipts 
                     WHERE user_id = :user_id
                 """)
@@ -54,6 +54,65 @@ async def get_result(
             # 테이블이 없는 경우 기본값 유지
         
         print(f"결과 조회 - 사용자: {current_user.id}, 면세점 타입: {duty_free_type}")
+        
+        # 📌 매칭 로직 자동 실행 (데이터 일관성 유지를 위해 활성화)
+        print("🔄 매칭 로직 자동 실행 중...")
+        try:
+            if duty_free_type == "shilla":
+                from app.services.shilla_matching import shilla_matching_result
+                print("🔄 신라 매칭 로직 자동 실행 중...")
+                shilla_matching_result(current_user.id)
+                print("✅ 신라 매칭 로직 완료")
+            else:
+                from app.services.matching import matchingResult
+                print("🔄 롯데 매칭 로직 자동 실행 중...")
+                matchingResult(current_user.id)
+                print("✅ 롯데 매칭 로직 완료")
+        except Exception as e:
+            print(f"⚠️ 매칭 로직 실행 중 오류: {e}")
+        
+        # 📌 매칭 완료 후 자동으로 수수료 계산 실행
+        print("💰 결과 페이지 새로고침 - 자동 수수료 계산 시작...")
+        try:
+            from app.services.commission_service import calculate_discounts_and_commissions
+            from sqlalchemy import text
+            
+            # sales_date 업데이트 (롯데의 경우)
+            if duty_free_type == "lotte":
+                print("📅 롯데 데이터 sales_date 업데이트 중...")
+                try:
+                    update_result = db.execute(sql_text('''
+                        UPDATE receipt_match_log 
+                        SET sales_date = (
+                            SELECT DATE(led."매출일자")
+                            FROM lotte_excel_data led
+                            WHERE led."receiptNumber" = receipt_match_log.receipt_number
+                            LIMIT 1
+                        )
+                        WHERE duty_free_type = 'lotte' 
+                        AND is_matched = TRUE 
+                        AND sales_date IS NULL
+                        AND user_id = :user_id
+                    '''), {"user_id": current_user.id}).rowcount
+                    
+                    db.commit()
+                    if update_result > 0:
+                        print(f"📅 sales_date 업데이트 완료: {update_result}개")
+                except Exception as update_error:
+                    print(f"⚠️ sales_date 업데이트 중 오류: {update_error}")
+                    db.rollback()
+            
+            # 수수료 계산 실행
+            commission_result = calculate_discounts_and_commissions(user_id=current_user.id)
+            if commission_result["success"]:
+                if commission_result['processed_count'] > 0:
+                    print(f"✅ 자동 수수료 계산 완료: {commission_result['processed_count']}개 처리")
+                else:
+                    print("✅ 수수료 계산 완료 (신규 처리할 데이터 없음)")
+            else:
+                print(f"⚠️ 자동 수수료 계산 실패: {commission_result['message']}")
+        except Exception as e:
+            print(f"⚠️ 자동 수수료 계산 중 오류: {e}")
         
         # 매칭된/안된 목록 조회
         matched, unmatched = fetch_results(current_user.id, duty_free_type)
@@ -167,7 +226,7 @@ async def change_item_type(
         if new_type == "receipt":
             # 면세점 타입 확인
             duty_free_type = "lotte"  # 기본값
-            shilla_count = db.execute(text("SELECT COUNT(*) FROM shilla_receipts WHERE user_id = :user_id"), 
+            shilla_count = db.execute(sql_text("SELECT COUNT(*) FROM shilla_receipts WHERE user_id = :user_id"), 
                                      {"user_id": current_user.id}).scalar()
             if shilla_count > 0:
                 duty_free_type = "shilla"

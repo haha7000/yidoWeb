@@ -168,7 +168,7 @@ async def update_passport_by_id(
             try:
                 # 롯데 데이터에서 검색
                 lotte_sql = text("""
-                    SELECT "receiptNumber", name, "PayBack" 
+                    SELECT "receiptNumber", name
                     FROM lotte_excel_data 
                     WHERE name = :name
                 """)
@@ -178,7 +178,7 @@ async def update_passport_by_id(
                     # 신라 데이터에서 검색 (여권번호로 매칭)
                     if passport_number:  # 여권번호가 있는 경우에만
                         shilla_sql = text("""
-                            SELECT "receiptNumber", name, "PayBack" 
+                            SELECT "receiptNumber", name
                             FROM shilla_excel_data 
                             WHERE passport_number = :passport_number
                         """)
@@ -294,7 +294,7 @@ async def update_passport(
             try:
                 # 롯데 데이터에서 검색
                 lotte_sql = text("""
-                    SELECT "receiptNumber", name, "PayBack" 
+                    SELECT "receiptNumber", name
                     FROM lotte_excel_data 
                     WHERE name = :name
                 """)
@@ -304,7 +304,7 @@ async def update_passport(
                     # 신라 데이터에서 검색 (여권번호로 매칭)
                     if passport_number:  # 여권번호가 있는 경우에만
                         shilla_sql = text("""
-                            SELECT "receiptNumber", name, "PayBack" 
+                            SELECT "receiptNumber", name
                             FROM shilla_excel_data 
                             WHERE passport_number = :passport_number
                         """)

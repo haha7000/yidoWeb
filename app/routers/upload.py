@@ -8,7 +8,7 @@ from datetime import datetime
 from fastapi import APIRouter, Request, Depends, File, Form, UploadFile, HTTPException
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import text, create_engine
+from sqlalchemy import text, create_engine, Text, Numeric, BigInteger, Integer, String
 
 from app.core.auth import get_current_user
 from app.core.database import get_db, SQLALCHEMY_DATABASE_URL
@@ -417,7 +417,7 @@ async def upload_excel(
                 df.columns = [col.replace("매출_", "") for col in df.columns]
                 
                 # 불필요한 컬럼 제거
-                columns_to_remove = ['순번', '0', '여행사', '여행사코드', '수입/로컬']
+                columns_to_remove = ['순번', '0', '여행사', '여행사코드']
                 df = df.drop(columns=[col for col in columns_to_remove if col in df.columns], errors='ignore')
                 
                 # 컬럼명 변경 - 핵심 컬럼들만 확인
@@ -427,8 +427,6 @@ async def upload_excel(
                         rename_mapping[col] = 'receiptNumber'
                     elif '고객명' in col or 'name' in col:
                         rename_mapping[col] = 'name'
-                    elif 'PayBack' in col or '환급' in col or '페이백' in col or '수수료' in col:
-                        rename_mapping[col] = 'PayBack'
                 
                 print(f"컬럼 매핑: {rename_mapping}")
                 df = df.rename(columns=rename_mapping)
@@ -439,10 +437,6 @@ async def upload_excel(
                 
                 if missing_columns:
                     raise Exception(f"필수 컬럼이 없습니다: {missing_columns}")
-                
-                # PayBack 컬럼이 없으면 기본값 설정
-                if 'PayBack' not in df.columns:
-                    df['PayBack'] = 0
                 
                 print(f"최종 컬럼들: {list(df.columns)}")
                 print(f"데이터 샘플: {df.head()}")
@@ -460,8 +454,6 @@ async def upload_excel(
                         rename_mapping[col] = 'receiptNumber'
                     elif '고객명' in str(col) or 'name' in str(col):
                         rename_mapping[col] = 'name'
-                    elif 'PayBack' in str(col) or '환급' in str(col) or '페이백' in str(col) or '수수료' in str(col):
-                        rename_mapping[col] = 'PayBack'
                 
                 df = df.rename(columns=rename_mapping)
                 
@@ -469,9 +461,7 @@ async def upload_excel(
                 if 'receiptNumber' not in df.columns or 'name' not in df.columns:
                     raise Exception("필수 컬럼(receiptNumber, name)을 찾을 수 없습니다.")
                 
-                # PayBack 컬럼이 없으면 기본값 설정
-                if 'PayBack' not in df.columns:
-                    df['PayBack'] = 0
+                
         
         else:
             table_name = 'shilla_excel_data'
@@ -481,7 +471,7 @@ async def upload_excel(
             print(f"신라 엑셀 원본 컬럼들: {list(df.columns)}")
 
             # 컬럼명 변경
-            df.rename(columns={'BILL 번호': 'receiptNumber', '고객명': 'name', '수수료': 'PayBack'}, inplace=True)
+            df.rename(columns={'BILL 번호': 'receiptNumber', '고객명': 'name'}, inplace=True)
             
             # 필수 컬럼 확인
             if 'receiptNumber' not in df.columns:
@@ -491,11 +481,6 @@ async def upload_excel(
             
             # receiptNumber를 문자열로 변환 (중요!)
             df['receiptNumber'] = df['receiptNumber'].astype(str)
-            
-            # PayBack 컬럼이 없으면 기본값 설정
-            if 'PayBack' not in df.columns:
-                df['PayBack'] = 0
-                print("PayBack 컬럼이 없어서 기본값 0으로 설정")
             
             # 신라 전용: passport_number 컬럼 추가 (매칭 시 업데이트용)
             df['passport_number'] = None
@@ -547,14 +532,99 @@ async def upload_excel(
                 else:
                     df_new = df.copy()
                 
+                # 📌 테이블별 데이터 타입 정의
+                if table_name == 'lotte_excel_data':
+                    # 롯데 엑셀 데이터 타입 정의 (금액 관련 컬럼들을 numeric으로 강제)
+                    dtype_mapping = {
+                        'receiptNumber': Text,
+                        'name': Text,
+                        '점구분': Text,
+                        '원매출일자': Text,
+                        '매출일자': Text,
+                        '수입/로컬': Text,
+                        '단체번호': Text,
+                        'VIP번호': Text,
+                        '교환권상태': Text,
+                        '카테고리': Text,
+                        '브랜드': Text,
+                        '상품명': Text,
+                        '상품구분': Text,
+                        '상품코드': Text,
+                        'Ref.No': Text,
+                        'Color': Text,
+                        '배송구분': Text,
+                        '판매방식': Text,
+                        '판매수량': Numeric,
+                        '판매가($)': Numeric,
+                        '총매출액($)': Numeric,
+                        '순매출액($)': Numeric,
+                        '할인액($)': Numeric,
+                        '총매출액(\)': Numeric,
+                        '순매출액(\)': Numeric,
+                        '할인액(\)': Numeric
+                    }
+                    
+                    # 📌 금액 컬럼들의 데이터 정제 (빈 문자열, 'nan', '-' 등을 0으로 변환)
+                    numeric_columns = ['판매수량', '판매가($)', '총매출액($)', '순매출액($)', '할인액($)', 
+                                     '총매출액(\)', '순매출액(\)', '할인액(\)']
+                    
+                    for col in numeric_columns:
+                        if col in df_new.columns:
+                            # 빈 문자열, NaN, '-', 'nan' 등을 0으로 변환
+                            df_new[col] = df_new[col].astype(str).replace(['', 'nan', '-', 'NaN', 'null', 'None'], '0')
+                            # 숫자가 아닌 문자 제거 (콤마, 공백 등)
+                            df_new[col] = df_new[col].str.replace(',', '').str.replace(' ', '')
+                            # 빈 문자열이 되면 0으로 설정
+                            df_new[col] = df_new[col].replace('', '0')
+                            # numeric으로 변환
+                            df_new[col] = pd.to_numeric(df_new[col], errors='coerce').fillna(0)
+                    
+                elif table_name == 'shilla_excel_data':
+                    dtype_mapping = {
+                        'receiptNumber': String(50),  # shilla_receipts와 동일한 타입으로 통일
+                        'name': Text,
+                        'passport_number': Text,
+                        # 금액 관련 컬럼들을 Numeric으로 강제 (실제 컬럼명으로 수정)
+                        '할인액(￦)': Numeric,
+                        '판매가($)': Numeric,
+                        '순매출액(￦)': Numeric,
+                        # 기타 컬럼들 (실제 사용되는 컬럼명으로 수정)
+                        '매출일자': Text,
+                        '카테고리': Text,
+                        '브랜드명': Text,
+                        '상품코드': Text,
+                        '점': Text
+                    }
+                    
+                    # 📌 신라 금액 컬럼들의 데이터 정제
+                    shilla_numeric_columns = ['할인액(￦)', '판매가($)', '순매출액(￦)']
+                    
+                    for col in shilla_numeric_columns:
+                        if col in df_new.columns:
+                            # 빈 문자열, NaN, '-', 'nan' 등을 0으로 변환
+                            df_new[col] = df_new[col].astype(str).replace(['', 'nan', '-', 'NaN', 'null', 'None'], '0')
+                            # 숫자가 아닌 문자 제거 (콤마, 공백 등)
+                            df_new[col] = df_new[col].str.replace(',', '').str.replace(' ', '')
+                            # 빈 문자열이 되면 0으로 설정
+                            df_new[col] = df_new[col].replace('', '0')
+                            # numeric으로 변환
+                            df_new[col] = pd.to_numeric(df_new[col], errors='coerce').fillna(0)
+                
+                else:
+                    # 기타 테이블은 기본 처리
+                    dtype_mapping = None
+                
                 records_added = len(df_new)
                 print(f"추가할 레코드 수: {records_added}")
                 
                 if records_added > 0:
-                    # 데이터 저장 시도
+                    # 📌 데이터 저장 시도 (dtype 매개변수 추가)
                     try:
                         # 먼저 append로 시도
-                        df_new.to_sql(table_name, connection, if_exists='append', index=False)
+                        if dtype_mapping:
+                            df_new.to_sql(table_name, connection, if_exists='append', index=False, dtype=dtype_mapping)
+                        else:
+                            df_new.to_sql(table_name, connection, if_exists='append', index=False)
                         print(f"✅ {table_name} 테이블에 {records_added}개 레코드 추가 완료")
                     except Exception as append_error:
                         print(f"append 실패, replace로 재시도: {append_error}")
@@ -562,8 +632,28 @@ async def upload_excel(
                         connection.execute(text("ROLLBACK"))
                         connection.execute(text("BEGIN"))
                         
-                        # 전체 데이터로 테이블 새로 생성
-                        df.to_sql(table_name, connection, if_exists='replace', index=False)
+                        # 📌 전체 데이터로 테이블 새로 생성 (dtype 매개변수 추가)
+                        if dtype_mapping:
+                            # 전체 df에도 동일한 데이터 정제 적용
+                            if table_name == 'lotte_excel_data':
+                                for col in numeric_columns:
+                                    if col in df.columns:
+                                        df[col] = df[col].astype(str).replace(['', 'nan', '-', 'NaN', 'null', 'None'], '0')
+                                        df[col] = df[col].str.replace(',', '').str.replace(' ', '')
+                                        df[col] = df[col].replace('', '0')
+                                        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                            elif table_name == 'shilla_excel_data':
+                                # 신라 금액 컬럼들의 데이터 정제 (replace 시에도 적용)
+                                for col in shilla_numeric_columns:
+                                    if col in df.columns:
+                                        df[col] = df[col].astype(str).replace(['', 'nan', '-', 'NaN', 'null', 'None'], '0')
+                                        df[col] = df[col].str.replace(',', '').str.replace(' ', '')
+                                        df[col] = df[col].replace('', '0')
+                                        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                            
+                            df.to_sql(table_name, connection, if_exists='replace', index=False, dtype=dtype_mapping)
+                        else:
+                            df.to_sql(table_name, connection, if_exists='replace', index=False)
                         records_added = len(df)
                         print(f"✅ {table_name} 테이블을 새로 생성하고 {records_added}개 레코드 추가 완료")
                         records_before = 0  # 새로 생성했으므로 이전 데이터는 0

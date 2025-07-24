@@ -40,7 +40,7 @@ class DataManager:
                         COUNT(DISTINCT p.id) as total_passports,
                         COUNT(DISTINCT CASE WHEN p.is_matched = TRUE THEN p.id END) as matched_passports
                     FROM shilla_receipts sr
-                    LEFT JOIN shilla_excel_data se ON se."receiptNumber"::text = sr.receipt_number
+                    LEFT JOIN shilla_excel_data se ON REPLACE(se."receiptNumber"::text, '.0', '') = sr.receipt_number
                     LEFT JOIN passports p ON p.user_id = sr.user_id
                     WHERE sr.user_id = :user_id
                     """

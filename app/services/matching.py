@@ -49,13 +49,20 @@ def matchingResult(user_id):
         results = session.execute(text(sql), {"user_id": user_id}).fetchall()
         print(f"롯데 매칭 처리할 영수증: {len(results)}개")
 
-        # 1단계: 기존 매칭 로그 삭제 (새로운 영수증 단위 로그로 대체)
-        session.query(ReceiptMatchLog).filter(
+        # 1단계: 선택적 업데이트를 위한 기존 로그 조회
+        existing_logs = {}
+        existing_logs_query = session.query(ReceiptMatchLog).filter(
             ReceiptMatchLog.user_id == user_id,
             ReceiptMatchLog.duty_free_type == "lotte"
-        ).delete()
+        ).all()
+        
+        for log in existing_logs_query:
+            existing_logs[log.receipt_number] = log
+        
+        print(f"기존 롯데 매칭 로그: {len(existing_logs)}개")
 
-        # 2단계: 영수증 단위 매칭 로그 생성
+        # 2단계: 영수증 단위 매칭 로그 업데이트/생성 (선택적 처리)
+        processed_receipts = set()
         
         for row in results:
             (receipt_number, is_matched, excel_name, passport_number, birthday,
@@ -87,35 +94,66 @@ def matchingResult(user_id):
                     print(f"날짜 파싱 오류: {sales_date} - {e}")
                     parsed_sales_date = None
             
-            # safe_float 함수는 app.utils.helpers에서 import됨
+            # 기존 로그가 있으면 업데이트, 없으면 새로 생성
+            if receipt_number in existing_logs:
+                # 기존 로그 업데이트
+                match_log = existing_logs[receipt_number]
+                match_log.is_matched = is_matched
+                match_log.excel_name = excel_name
+                match_log.passport_number = passport_number
+                match_log.birthday = birthday
+                match_log.sales_date = parsed_sales_date
+                match_log.category = categories
+                match_log.brand = brands
+                match_log.product_code = f"TOTAL_{product_count}_ITEMS"
+                match_log.discount_amount_krw = safe_float(total_discount_krw)
+                match_log.sales_price_usd = safe_float(total_sales_usd)
+                match_log.net_sales_krw = safe_float(total_net_sales_krw)
+                match_log.store_branch = store_branch
+                match_log.checked_at = datetime.now()  # 업데이트 시간 갱신
+                print(f"기존 매칭 로그 업데이트: {receipt_number}")
+            else:
+                # 새 매칭 로그 생성
+                match_log = ReceiptMatchLog(
+                    user_id=user_id,
+                    receipt_number=receipt_number,
+                    is_matched=is_matched,
+                    excel_name=excel_name,
+                    passport_number=passport_number,
+                    birthday=birthday,
+                    sales_date=parsed_sales_date,
+                    category=categories,
+                    brand=brands,
+                    product_code=f"TOTAL_{product_count}_ITEMS",
+                    discount_amount_krw=safe_float(total_discount_krw),
+                    sales_price_usd=safe_float(total_sales_usd),
+                    net_sales_krw=safe_float(total_net_sales_krw),
+                    store_branch=store_branch,
+                    duty_free_type="lotte"
+                )
+                session.add(match_log)
+                print(f"새 매칭 로그 생성: {receipt_number}")
             
-            # 영수증 단위 매칭 로그 생성 (여권 풀네임 사용)
-            match_log = ReceiptMatchLog(
-                user_id=user_id,
-                receipt_number=receipt_number,
-                is_matched=is_matched,
-                excel_name=excel_name,  # 여권 풀네임 우선 사용
-                passport_number=passport_number,
-                birthday=birthday,
-                # 집계된 상세 정보
-                sales_date=parsed_sales_date,
-                category=categories,  # 모든 카테고리를 콤마로 구분
-                brand=brands,  # 모든 브랜드를 콤마로 구분
-                product_code=f"TOTAL_{product_count}_ITEMS",  # 상품 수 표시
-                discount_amount_krw=safe_float(total_discount_krw),
-                sales_price_usd=safe_float(total_sales_usd),
-                net_sales_krw=safe_float(total_net_sales_krw),
-                store_branch=store_branch,
-                duty_free_type="lotte"
-            )
-            session.add(match_log)
+            processed_receipts.add(receipt_number)
                 
-            print(f"영수증 단위 매칭 로그 생성: {receipt_number} ({product_count}개 상품)")
+            print(f"영수증 단위 매칭 로그 처리: {receipt_number} ({product_count}개 상품)")
+
+        # 3단계: 더 이상 존재하지 않는 영수증의 로그 정리 (선택적 삭제)
+        obsolete_receipts = set(existing_logs.keys()) - processed_receipts
+        if obsolete_receipts:
+            print(f"더 이상 존재하지 않는 영수증 로그 {len(obsolete_receipts)}개 정리 중...")
+            for obsolete_receipt in obsolete_receipts:
+                session.delete(existing_logs[obsolete_receipt])
+                print(f"  - 삭제: {obsolete_receipt}")
 
         session.commit()
-        print("롯데 영수증 단위 매칭 결과 저장 완료")
+        print(f"✅ 롯데 매칭 로직 완료:")
+        print(f"  - 처리된 영수증: {len(processed_receipts)}개")
+        print(f"  - 업데이트된 로그: {len([r for r in processed_receipts if r in existing_logs])}개") 
+        print(f"  - 새로 생성된 로그: {len([r for r in processed_receipts if r not in existing_logs])}개")
+        print(f"  - 정리된 obsolete 로그: {len(obsolete_receipts)}개")
 
-        # 3단계: 여권 매칭 상태 업데이트
+        # 4단계: 여권 매칭 상태 업데이트
         passport_update_sql = """
         UPDATE passports p
         SET is_matched = TRUE

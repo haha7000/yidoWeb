@@ -151,7 +151,7 @@ async def update_unmatched(
             
             # 롯데 엑셀 데이터에서 검색 (상세 정보 포함)
             sql = text("""
-                SELECT "receiptNumber", name, "PayBack",
+                SELECT "receiptNumber", name,
                        "매출일자" as sales_date,
                        "카테고리" as category,
                        "브랜드" as brand,
@@ -187,31 +187,29 @@ async def update_unmatched(
                         match_log.birthday = passport_info.birthday
                 
                 # 엑셀 상세 정보 업데이트
-                if result:
-                    # 날짜 변환 처리
+                if result and len(result) >= 10:  # 결과가 충분한 컬럼을 가지고 있는지 확인
+                    # 날짜 변환 처리 (인덱스 2가 sales_date)
                     parsed_sales_date = None
-                    if result[3]:  # sales_date
+                    if result[2]:  # sales_date - 올바른 인덱스 사용
                         try:
-                            if isinstance(result[3], str):
-                                parsed_sales_date = datetime.strptime(result[3], '%Y-%m-%d').date()
-                            elif hasattr(result[3], 'date'):
-                                parsed_sales_date = result[3].date()
+                            if isinstance(result[2], str):
+                                parsed_sales_date = datetime.strptime(result[2], '%Y-%m-%d').date()
+                            elif hasattr(result[2], 'date'):
+                                parsed_sales_date = result[2].date()
                             else:
-                                parsed_sales_date = result[3]
+                                parsed_sales_date = result[2]
                         except (ValueError, AttributeError) as e:
-                            print(f"날짜 파싱 오류: {result[3]} - {e}")
+                            print(f"날짜 파싱 오류: {result[2]} - {e}")
                             parsed_sales_date = None
                     
-                    # safe_float 함수는 app.utils.helpers에서 import됨
-                    
                     match_log.sales_date = parsed_sales_date
-                    match_log.category = result[4]  # category
-                    match_log.brand = result[5]  # brand
-                    match_log.product_code = result[6]  # product_code
-                    match_log.discount_amount_krw = safe_float(result[7])  # discount_amount_krw
-                    match_log.sales_price_usd = safe_float(result[8])  # sales_price_usd
-                    match_log.net_sales_krw = safe_float(result[9])  # net_sales_krw
-                    match_log.store_branch = result[10]  # store_branch
+                    match_log.category = result[3]  # category
+                    match_log.brand = result[4]  # brand
+                    match_log.product_code = result[5]  # product_code
+                    match_log.discount_amount_krw = safe_float(result[6])  # discount_amount_krw
+                    match_log.sales_price_usd = safe_float(result[7])  # sales_price_usd
+                    match_log.net_sales_krw = safe_float(result[8])  # net_sales_krw
+                    match_log.store_branch = result[9]  # store_branch
                     match_log.duty_free_type = "lotte"  # 롯데 면세점 명시
             else:
                 # 새 로그 생성 시에도 상세 정보 포함
@@ -224,20 +222,18 @@ async def update_unmatched(
                 
                 # 날짜 변환 처리
                 parsed_sales_date = None
-                if result and result[3]:  # sales_date
+                if result and len(result) >= 10 and result[2]:  # sales_date - 올바른 인덱스 사용
                     try:
-                        if isinstance(result[3], str):
-                            parsed_sales_date = datetime.strptime(result[3], '%Y-%m-%d').date()
-                        elif hasattr(result[3], 'date'):
-                            parsed_sales_date = result[3].date()
+                        if isinstance(result[2], str):
+                            parsed_sales_date = datetime.strptime(result[2], '%Y-%m-%d').date()
+                        elif hasattr(result[2], 'date'):
+                            parsed_sales_date = result[2].date()
                         else:
-                            parsed_sales_date = result[3]
+                            parsed_sales_date = result[2]
                     except (ValueError, AttributeError) as e:
-                        print(f"날짜 파싱 오류: {result[3]} - {e}")
+                        print(f"날짜 파싱 오류: {result[2]} - {e}")
                         parsed_sales_date = None
                 
-                # safe_float 함수는 app.utils.helpers에서 import됨
-                    
                 new_match_log = ReceiptMatchLog(
                     user_id=current_user.id,
                     receipt_number=new_receipt_number,
@@ -245,20 +241,29 @@ async def update_unmatched(
                     excel_name=result[1] if result else None,
                     passport_number=passport_info.passport_number if passport_info else None,
                     birthday=passport_info.birthday if passport_info else None,
-                    # 엑셀 상세 정보
+                    # 엑셀 상세 정보 (안전한 인덱스 접근)
                     sales_date=parsed_sales_date if result else None,
-                    category=result[4] if result else None,
-                    brand=result[5] if result else None,
-                    product_code=result[6] if result else None,
-                    discount_amount_krw=safe_float(result[7]) if result else None,
-                    sales_price_usd=safe_float(result[8]) if result else None,
-                    net_sales_krw=safe_float(result[9]) if result else None,
-                    store_branch=result[10] if result else None,
+                    category=result[3] if (result and len(result) > 3) else None,
+                    brand=result[4] if (result and len(result) > 4) else None,
+                    product_code=result[5] if (result and len(result) > 5) else None,
+                    discount_amount_krw=safe_float(result[6]) if (result and len(result) > 6) else None,
+                    sales_price_usd=safe_float(result[7]) if (result and len(result) > 7) else None,
+                    net_sales_krw=safe_float(result[8]) if (result and len(result) > 8) else None,
+                    store_branch=result[9] if (result and len(result) > 9) else None,
                     duty_free_type="lotte"  # 롯데 면세점 명시
                 )
                 db.add(new_match_log)
                     
             db.commit()
+            
+            # 📌 롯데 매칭 로직 재실행 (영수증 수정 후 전체 업데이트)
+            try:
+                from app.services.matching import matchingResult
+                print("🔄 롯데 매칭 로직 재실행 중...")
+                matchingResult(current_user.id)
+                print("✅ 롯데 매칭 로직 재실행 완료")
+            except Exception as e:
+                print(f"⚠️ 롯데 매칭 로직 재실행 중 오류: {e}")
             
             # 매칭 성공 시 자동으로 할인율 수수료 계산
             is_matched = result is not None
@@ -317,7 +322,7 @@ async def update_unmatched(
         
         # 신라 엑셀 데이터에서 영수증 번호 매칭 확인 (상세 정보 포함)
         excel_sql = text("""
-            SELECT "receiptNumber", name, "PayBack",
+            SELECT "receiptNumber", name,
                    "매출일자" as sales_date,
                    "카테고리" as category,
                    "브랜드명" as brand,
@@ -367,49 +372,46 @@ async def update_unmatched(
             match_log.birthday = passport_info.birthday if passport_info else None
             
             # 엑셀 상세 정보 업데이트
-            if excel_result:
-                # 날짜 변환 처리
+            if excel_result and len(excel_result) >= 10:  # 결과가 충분한 컬럼을 가지고 있는지 확인
+                # 날짜 변환 처리 (인덱스 2가 sales_date)
                 parsed_sales_date = None
-                if excel_result[3]:  # sales_date
+                if excel_result[2]:  # sales_date - 올바른 인덱스 사용
                     try:
-                        if isinstance(excel_result[3], str):
-                            parsed_sales_date = datetime.strptime(excel_result[3], '%Y-%m-%d').date()
-                        elif hasattr(excel_result[3], 'date'):
-                            parsed_sales_date = excel_result[3].date()
+                        if isinstance(excel_result[2], str):
+                            parsed_sales_date = datetime.strptime(excel_result[2], '%Y-%m-%d').date()
+                        elif hasattr(excel_result[2], 'date'):
+                            parsed_sales_date = excel_result[2].date()
                         else:
-                            parsed_sales_date = excel_result[3]
+                            parsed_sales_date = excel_result[2]
                     except (ValueError, AttributeError) as e:
-                        print(f"날짜 파싱 오류: {excel_result[3]} - {e}")
+                        print(f"날짜 파싱 오류: {excel_result[2]} - {e}")
                         parsed_sales_date = None
                 
-                # safe_float 함수는 app.utils.helpers에서 import됨
-                
                 match_log.sales_date = parsed_sales_date
-                match_log.category = excel_result[4]  # category
-                match_log.brand = excel_result[5]  # brand
-                match_log.product_code = excel_result[6]  # product_code
-                match_log.discount_amount_krw = safe_float(excel_result[7])  # discount_amount_krw
-                match_log.sales_price_usd = safe_float(excel_result[8])  # sales_price_usd
-                match_log.net_sales_krw = safe_float(excel_result[9])  # net_sales_krw
-                match_log.store_branch = excel_result[10]  # store_branch
+                match_log.category = excel_result[3]  # category
+                match_log.brand = excel_result[4]  # brand
+                match_log.product_code = excel_result[5]  # product_code
+                match_log.discount_amount_krw = safe_float(excel_result[6])  # discount_amount_krw
+                match_log.sales_price_usd = safe_float(excel_result[7])  # sales_price_usd
+                match_log.net_sales_krw = safe_float(excel_result[8])  # net_sales_krw
+                match_log.store_branch = excel_result[9]  # store_branch
                 match_log.duty_free_type = "shilla"  # 신라 면세점 명시
+                match_log.checked_at = datetime.now()  # 수동 업데이트 시간 기록
         else:
             # 새 로그 생성 (상세 정보 포함)
             # 날짜 변환 처리
             parsed_sales_date = None
-            if excel_result and excel_result[3]:  # sales_date
+            if excel_result and len(excel_result) >= 10 and excel_result[2]:  # sales_date - 올바른 인덱스 사용
                 try:
-                    if isinstance(excel_result[3], str):
-                        parsed_sales_date = datetime.strptime(excel_result[3], '%Y-%m-%d').date()
-                    elif hasattr(excel_result[3], 'date'):
-                        parsed_sales_date = excel_result[3].date()
+                    if isinstance(excel_result[2], str):
+                        parsed_sales_date = datetime.strptime(excel_result[2], '%Y-%m-%d').date()
+                    elif hasattr(excel_result[2], 'date'):
+                        parsed_sales_date = excel_result[2].date()
                     else:
-                        parsed_sales_date = excel_result[3]
+                        parsed_sales_date = excel_result[2]
                 except (ValueError, AttributeError) as e:
-                    print(f"날짜 파싱 오류: {excel_result[3]} - {e}")
+                    print(f"날짜 파싱 오류: {excel_result[2]} - {e}")
                     parsed_sales_date = None
-            
-            # safe_float 함수는 app.utils.helpers에서 import됨
             
             new_match_log = ReceiptMatchLog(
                 user_id=current_user.id,
@@ -418,16 +420,17 @@ async def update_unmatched(
                 excel_name=excel_result[1] if excel_result else None,
                 passport_number=passport_number.strip() if passport_number.strip() else None,
                 birthday=passport_info.birthday if passport_info else None,
-                # 엑셀 상세 정보
+                # 엑셀 상세 정보 (안전한 인덱스 접근)
                 sales_date=parsed_sales_date if excel_result else None,
-                category=excel_result[4] if excel_result else None,
-                brand=excel_result[5] if excel_result else None,
-                product_code=excel_result[6] if excel_result else None,
-                discount_amount_krw=safe_float(excel_result[7]) if excel_result else None,
-                sales_price_usd=safe_float(excel_result[8]) if excel_result else None,
-                net_sales_krw=safe_float(excel_result[9]) if excel_result else None,
-                store_branch=excel_result[10] if excel_result else None,
-                duty_free_type="shilla"  # 신라 면세점 명시
+                category=excel_result[3] if (excel_result and len(excel_result) > 3) else None,
+                brand=excel_result[4] if (excel_result and len(excel_result) > 4) else None,
+                product_code=excel_result[5] if (excel_result and len(excel_result) > 5) else None,
+                discount_amount_krw=safe_float(excel_result[6]) if (excel_result and len(excel_result) > 6) else None,
+                sales_price_usd=safe_float(excel_result[7]) if (excel_result and len(excel_result) > 7) else None,
+                net_sales_krw=safe_float(excel_result[8]) if (excel_result and len(excel_result) > 8) else None,
+                store_branch=excel_result[9] if (excel_result and len(excel_result) > 9) else None,
+                duty_free_type="shilla",  # 신라 면세점 명시
+                checked_at=datetime.now()  # 수동 업데이트 시간 기록
             )
             db.add(new_match_log)
         
@@ -453,6 +456,15 @@ async def update_unmatched(
         print(f"  - 영수증번호: {old_receipt_number} -> {new_receipt_number}")
         print(f"  - 여권번호: {old_passport_number} -> {passport_number}")
         print(f"  - 엑셀 매칭: {'성공' if excel_result else '실패'}")
+        
+        # 📌 신라 매칭 로직 재실행 (영수증 수정 후 전체 업데이트)
+        try:
+            from app.services.shilla_matching import shilla_matching_result
+            print("🔄 신라 매칭 로직 재실행 중...")
+            shilla_matching_result(current_user.id)
+            print("✅ 신라 매칭 로직 재실행 완료")
+        except Exception as e:
+            print(f"⚠️ 신라 매칭 로직 재실행 중 오류: {e}")
         
         # 매칭 성공 시 자동으로 할인율 수수료 계산
         is_matched = excel_result is not None

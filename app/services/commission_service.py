@@ -382,6 +382,61 @@ def calculate_discounts_and_commissions(user_id: int = None):
     with CommissionService() as service:
         return service.calculate_and_update_all_commissions(user_id)
 
+def calculate_commission_for_receipt(receipt_number: str, user_id: int):
+    """특정 영수증 번호에 대해 할인율과 수수료를 계산하고 업데이트"""
+    try:
+        with CommissionService() as service:
+            # 해당 영수증의 매칭된 데이터 조회
+            query = """
+            SELECT id, user_id, receipt_number, discount_amount_krw, sales_price_usd, 
+                   net_sales_krw, sales_date, category, brand, product_code, store_branch, duty_free_type
+            FROM receipt_match_log 
+            WHERE is_matched = TRUE 
+            AND receipt_number = :receipt_number
+            AND user_id = :user_id
+            AND discount_amount_krw IS NOT NULL 
+            AND sales_price_usd IS NOT NULL 
+            AND net_sales_krw IS NOT NULL
+            """
+            
+            result = service.session.execute(text(query), {
+                "receipt_number": receipt_number,
+                "user_id": user_id
+            }).fetchall()
+            
+            if not result:
+                return {
+                    "success": True,
+                    "message": f"영수증 번호 {receipt_number}에 대한 매칭된 데이터가 없습니다.",
+                    "processed_count": 0
+                }
+            
+            processed_count = 0
+            for row in result:
+                try:
+                    service._calculate_and_update_single_record(row)
+                    processed_count += 1
+                except Exception as e:
+                    logger.error(f"영수증 {receipt_number} 처리 중 오류: {e}")
+                    continue
+            
+            # 변경사항 커밋
+            service.session.commit()
+            
+            return {
+                "success": True,
+                "message": f"영수증 {receipt_number}의 할인율 및 수수료 계산 완료",
+                "processed_count": processed_count
+            }
+            
+    except Exception as e:
+        logger.error(f"영수증 {receipt_number} 수수료 계산 중 오류: {e}")
+        return {
+            "success": False,
+            "message": f"계산 중 오류가 발생했습니다: {str(e)}",
+            "processed_count": 0
+        }
+
 def get_commission_summary(user_id: int = None):
     """수수료 계산 결과 요약 조회 함수"""
     with CommissionService() as service:

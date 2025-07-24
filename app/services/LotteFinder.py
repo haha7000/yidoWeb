@@ -66,7 +66,7 @@ def LotteAiOcr(imagePath, user_id):
     db = SessionLocal()
     try:
         # OCR 및 GPT 처리
-        # response = requests.post("http://localhost:9000/ocr", files={"file": open(imagePath, "rb")})
+        # response = requests.post("http://host.docker.internal:9000/ocr", files={"file": open(imagePath, "rb")})
         # ocrResult = response.json()
         # ocrResult = ocrResult['text']
         ocrResult = VisionOcr(imagePath)

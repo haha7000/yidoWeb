@@ -81,7 +81,7 @@ class ArchiveService:
                     COUNT(DISTINCT p.id) as total_passports,
                     COUNT(DISTINCT CASE WHEN p.is_matched = TRUE THEN p.id END) as matched_passports
                 FROM shilla_receipts sr
-                LEFT JOIN shilla_excel_data se ON se."receiptNumber"::text = sr.receipt_number
+                LEFT JOIN shilla_excel_data se ON '0' || REPLACE(se."receiptNumber", '.0', ''') = sr.receipt_number
                 LEFT JOIN passports p ON p.user_id = sr.user_id
                 WHERE sr.user_id = :user_id
                 """
@@ -96,7 +96,7 @@ class ArchiveService:
                     se.passport_number as excel_passport,
                     CASE WHEN se."receiptNumber" IS NOT NULL THEN true ELSE false END as matched
                 FROM shilla_receipts sr
-                LEFT JOIN shilla_excel_data se ON se."receiptNumber"::text = sr.receipt_number
+                LEFT JOIN shilla_excel_data se ON '0' || REPLACE(se."receiptNumber", '.0', ''') = sr.receipt_number
                 WHERE sr.user_id = :user_id
                 ORDER BY sr.receipt_number
                 """
@@ -191,25 +191,114 @@ class ArchiveService:
             print(f"상세 이력 저장 시작 (타입: {duty_free_type})")
             
             if duty_free_type == "shilla":
-                # 신라 매칭 결과 조회
-                history_sql = """
-                SELECT DISTINCT
-                    COALESCE(p.name, se.name) as customer_name,
-                    COALESCE(sr.passport_number, se.passport_number) as passport_number,
+                # 신라 매칭된 데이터 조회
+                shilla_sql = """
+                SELECT 
                     sr.receipt_number,
                     se.name as excel_name,
+                    sr.passport_number,
                     p.name as passport_name,
-                    p.birthday,
-                    CASE WHEN se."receiptNumber" IS NOT NULL THEN 'matched' ELSE 'unmatched' END as match_status
+                    p.birthday
                 FROM shilla_receipts sr
-                LEFT JOIN shilla_excel_data se ON se."receiptNumber"::text = sr.receipt_number
-                LEFT JOIN passports p ON COALESCE(sr.passport_number, se.passport_number) = p.passport_number 
+                LEFT JOIN shilla_excel_data se ON REPLACE(se."receiptNumber"::text, '.0', '') = sr.receipt_number
+                LEFT JOIN passports p ON p.passport_number = COALESCE(sr.passport_number, se.passport_number) 
                                        AND p.user_id = :user_id
                 WHERE sr.user_id = :user_id
-                AND se."receiptNumber" IS NOT NULL  -- 매칭된 것만
-                ORDER BY customer_name
+                AND se."receiptNumber" IS NOT NULL
                 """
-            else:
+                
+                shilla_results = db.execute(text(shilla_sql), {"user_id": user_id}).fetchall()
+                
+                # 신라 매칭되지 않은 데이터 조회
+                shilla_unmatched_sql = """
+                SELECT DISTINCT sr.*
+                FROM shilla_receipts sr
+                LEFT JOIN shilla_excel_data se ON REPLACE(se."receiptNumber"::text, '.0', '') = sr.receipt_number
+                WHERE se."receiptNumber" IS NULL AND sr.user_id = :user_id
+                """
+                
+                shilla_unmatched = db.execute(text(shilla_unmatched_sql), {"user_id": user_id}).fetchall()
+                
+                print(f"신라 매칭된 데이터: {len(shilla_results)}개")
+                print(f"신라 매칭되지 않은 데이터: {len(shilla_unmatched)}개")
+                
+                # 고객별로 그룹화하여 저장
+                customer_groups = {}
+                for row in shilla_results:
+                    customer_name = row[0] or '알 수 없음'
+                    passport_number = row[1]
+                    receipt_number = row[2]
+                    excel_name = row[3]
+                    passport_name = row[4]
+                    birthday = row[5]
+                    match_status = 'matched'
+                    
+                    # 고객별 그룹화 키
+                    group_key = f"{customer_name}_{passport_number}" if passport_number else f"{customer_name}_no_passport"
+                    
+                    if group_key not in customer_groups:
+                        customer_groups[group_key] = {
+                            'customer_name': customer_name,
+                            'passport_number': passport_number,
+                            'receipt_numbers': [],
+                            'excel_data': {
+                                'excel_name': excel_name,
+                                'passport_name': passport_name,
+                                'birthday': birthday.isoformat() if birthday else None,
+                                'duty_free_type': duty_free_type
+                            },
+                            'match_status': match_status
+                        }
+                    
+                    customer_groups[group_key]['receipt_numbers'].append(receipt_number)
+                
+                # 매칭되지 않은 신라 데이터도 그룹화
+                for row in shilla_unmatched:
+                    customer_name = row.name or '알 수 없음'
+                    passport_number = row.passport_number
+                    receipt_number = row.receipt_number
+                    excel_name = row.name
+                    passport_name = row.name
+                    birthday = row.birthday
+                    match_status = 'unmatched'
+                    
+                    group_key = f"{customer_name}_{passport_number}" if passport_number else f"{customer_name}_no_passport"
+                    
+                    if group_key not in customer_groups:
+                        customer_groups[group_key] = {
+                            'customer_name': customer_name,
+                            'passport_number': passport_number,
+                            'receipt_numbers': [],
+                            'excel_data': {
+                                'excel_name': excel_name,
+                                'passport_name': passport_name,
+                                'birthday': birthday.isoformat() if birthday else None,
+                                'duty_free_type': duty_free_type
+                            },
+                            'match_status': match_status
+                        }
+                    
+                    customer_groups[group_key]['receipt_numbers'].append(receipt_number)
+                
+                # 각 그룹별로 MatchingHistory 레코드 생성
+                saved_count = 0
+                for group_data in customer_groups.values():
+                    history = MatchingHistory(
+                        user_id=user_id,
+                        archive_id=archive_id,
+                        customer_name=group_data['customer_name'],
+                        passport_number=group_data['passport_number'],
+                        receipt_numbers=json.dumps(group_data['receipt_numbers']),
+                        excel_data=group_data['excel_data'],
+                        match_status=group_data['match_status']
+                    )
+                    db.add(history)
+                    saved_count += 1
+                    print(f"이력 저장: {group_data['customer_name']} - {len(group_data['receipt_numbers'])}건")
+                
+                return saved_count
+                
+            else: # duty_free_type == "lotte"
                 # 롯데 매칭 결과 조회
                 history_sql = """
                 SELECT DISTINCT
