@@ -116,6 +116,7 @@ class ReceiptMatchLog(Base):
     # 할인율 및 수수료 계산 컬럼들
     discount_rate = Column(DECIMAL(5,2), nullable=True)  # 할인율 (%)
     commission_fee = Column(DECIMAL(12,2), nullable=True)  # 계산된 수수료 (원)
+    commission_rate = Column(DECIMAL(5,4), nullable=True)  # 수수료율 (소수점 4자리까지)
     
     # 면세점 타입 (lotte, shilla)
     duty_free_type = Column(String(20), nullable=True)  # 면세점 타입
@@ -378,4 +379,6 @@ class PassportArchive(Base):
     
 #     def __repr__(self):
 #         return f"<LotteExcelData(name={self.name}, receiptNumber={self.receiptNumber}, 상품명={self.상품명})>"
+
+
 
