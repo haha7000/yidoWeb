@@ -101,7 +101,6 @@
                         <option value="">전체</option>
                         <option value="lotte">롯데면세점</option>
                         <option value="shilla">신라면세점</option>
-                        <option value="hyundai">현대면세점</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -109,10 +108,7 @@
                     <select class="form-select" id="branch" name="branch">
                         <option value="">전체</option>
                         <option value="main">본점</option>
-                        <option value="airport">공항점</option>
-                        <option value="gangnam">강남점</option>
                         <option value="myeongdong">명동본점</option>
-                        <option value="busan">부산</option>
                         <option value="seoul">서울점</option>
                         <option value="worldtower">월드타워</option>
                     </select>
@@ -376,17 +372,17 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('현재 유저 ID:', getCurrentUserId());
 });
 
-// API 기본 URL 설정 (fee API는 8000번 포트 사용)
+// API 기본 URL 설정 (Nginx 프록시 사용)
 function getApiBaseUrl() {
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
     
-    // 개발 환경에서는 localhost, 프로덕션에서는 현재 호스트 사용
+    // 개발 환경에서는 localhost, 프로덕션에서는 프록시 사용
     if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') {
         return `${protocol}//${hostname}:8003`;
     } else {
-        // AWS 환경에서는 현재 호스트의 8000 포트 사용
-        return `${protocol}//${hostname}:8000`;
+        // 프로덕션에서는 Nginx 프록시를 통해 접근 (포트 없음)
+        return `${protocol}//${hostname}`;
     }
 }
 

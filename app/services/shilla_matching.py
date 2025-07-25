@@ -12,7 +12,24 @@ def shilla_matching_result(user_id):
     """신라 면세점 매칭 로직 - 영수증 단위로 매칭 로그 생성 (중복 방지)"""
     
     with SessionLocal() as session:
-        print("신라 면세점 매칭 시작")
+        print(f"🚀 신라 면세점 매칭 시작 - 사용자 ID: {user_id}")
+        print("=" * 60)
+        
+        # 데이터 현황 확인
+        receipt_count = session.execute(text("SELECT COUNT(*) FROM shilla_receipts WHERE user_id = :user_id"), {"user_id": user_id}).scalar()
+        excel_count = session.execute(text("SELECT COUNT(*) FROM shilla_excel_data")).scalar()
+        passport_count = session.execute(text("SELECT COUNT(*) FROM passports WHERE user_id = :user_id"), {"user_id": user_id}).scalar()
+        log_count = session.execute(text("SELECT COUNT(*) FROM receipt_match_log WHERE user_id = :user_id AND duty_free_type = 'shilla'"), {"user_id": user_id}).scalar()
+        
+        print(f"📊 데이터 현황:")
+        print(f"   - 신라 영수증: {receipt_count}개")
+        print(f"   - 신라 엑셀 데이터: {excel_count}개")
+        print(f"   - 여권: {passport_count}개")
+        print(f"   - 기존 매칭 로그: {log_count}개")
+        
+        if receipt_count == 0:
+            print("⚠️ 신라 영수증이 없습니다. 매칭을 종료합니다.")
+            return
         
         # 1단계: 여권 매칭 상태 업데이트 (여권번호만 기준으로 정확한 매칭)
         sql_update_passport_from_excel = """
@@ -87,7 +104,7 @@ def shilla_matching_result(user_id):
         FROM shilla_receipts sr
         LEFT JOIN shilla_excel_data se ON REPLACE(se."receiptNumber"::text, '.0', '') = sr.receipt_number
         LEFT JOIN passports p
-          ON p.passport_number = COALESCE(sr.passport_number, se.passport_number)
+          ON (p.passport_number = sr.passport_number OR p.passport_number = se.passport_number)
           AND p.user_id = :user_id
           AND p.passport_number IS NOT NULL
           AND p.passport_number != ''
@@ -144,15 +161,30 @@ def shilla_matching_result(user_id):
              product_count, total_discount_krw, total_sales_usd, total_net_sales_krw, 
              store_branch) = row
             
-            # 최종 여권번호 결정
-            final_passport_number = receipt_passport_number or excel_passport_number
+            # 최종 여권번호 결정 - 여권 테이블과 매칭되는 번호 우선
+            final_passport_number = None
+            if passport_name:  # 여권 테이블과 매칭된 경우
+                # 여권 테이블과 매칭되는 번호를 우선 사용
+                if excel_passport_number and passport_name:
+                    final_passport_number = excel_passport_number
+                elif receipt_passport_number and passport_name:
+                    final_passport_number = receipt_passport_number
+            else:
+                # 여권 테이블과 매칭되지 않은 경우 기존 로직 사용
+                final_passport_number = receipt_passport_number or excel_passport_number
+            
+            print(f"📋 여권번호 결정: 영수증({receipt_passport_number}) vs 엑셀({excel_passport_number}) -> 최종({final_passport_number})")
+            print(f"📋 여권 이름: {passport_name}")
             
             # 신라 면세점의 경우: 여권과 매칭이 완료되면 여권의 실제 이름을 사용
             final_excel_name = excel_name
             if final_passport_number and passport_name:
+                print(f"🔄 여권 이름으로 업데이트: {excel_name} -> {passport_name} (여권번호: {final_passport_number})")
                 final_excel_name = passport_name
+            else:
+                print(f"📋 엑셀 이름 유지: {excel_name} (여권번호: {final_passport_number}, 여권이름: {passport_name})")
             
-            print(f"신라 영수증: {receipt_number}, 매칭: {is_matched}, 이름: {final_excel_name}")
+            print(f"신라 영수증: {receipt_number}, 매칭: {is_matched}, 최종이름: {final_excel_name}")
             if is_matched:
                 print(f"  - 매출일자: {sales_date}")
                 print(f"  - 카테고리: {categories}")
@@ -183,16 +215,21 @@ def shilla_matching_result(user_id):
             if receipt_number in existing_logs:
                 match_log = existing_logs[receipt_number]
                 
-                # 최근에 수동으로 업데이트된 로그인지 확인 (5분 이내)
+                # 최근에 수동으로 업데이트된 로그인지 확인 (30초 이내)
                 recent_manual_update = False
                 if match_log.checked_at:
                     time_diff = datetime.now() - match_log.checked_at
-                    if time_diff.total_seconds() < 300:  # 5분 = 300초
+                    if time_diff.total_seconds() < 30:  # 30초 = 여권 이름 업데이트는 거의 즉시 허용
                         recent_manual_update = True
                         print(f"🔒 최근 수동 업데이트된 로그 보호: {receipt_number} (업데이트: {match_log.checked_at})")
+                    elif final_passport_number and passport_name and match_log.excel_name != passport_name:
+                        # 여권 이름으로 업데이트하는 경우는 보호 시간을 무시
+                        print(f"🔄 여권 이름 업데이트를 위해 보호 무시: {receipt_number}")
+                        recent_manual_update = False
                 
                 if not recent_manual_update:
                     # 자동 매칭 로직으로 업데이트
+                    old_name = match_log.excel_name
                     match_log.is_matched = is_matched
                     match_log.excel_name = final_excel_name
                     match_log.passport_number = final_passport_number
@@ -206,7 +243,9 @@ def shilla_matching_result(user_id):
                     match_log.net_sales_krw = safe_float(total_net_sales_krw)
                     match_log.store_branch = store_branch
                     # checked_at은 수동 업데이트 시에만 갱신, 자동 매칭에서는 유지
-                    print(f"기존 매칭 로그 자동 업데이트: {receipt_number}")
+                    print(f"🔄 기존 매칭 로그 자동 업데이트: {receipt_number}")
+                    print(f"   이름 변경: {old_name} -> {final_excel_name}")
+                    print(f"   여권번호: {final_passport_number}")
                 else:
                     print(f"⏭️ 수동 업데이트 로그 건너뜀: {receipt_number}")
             else:
@@ -229,7 +268,10 @@ def shilla_matching_result(user_id):
                     duty_free_type="shilla"
                 )
                 session.add(match_log)
-                print(f"새 매칭 로그 생성: {receipt_number}")
+                print(f"✨ 새 매칭 로그 생성: {receipt_number}")
+                print(f"   이름: {final_excel_name}")
+                print(f"   여권번호: {final_passport_number}")
+                print(f"   매칭상태: {is_matched}")
             
             processed_receipts.add(receipt_number)
                 
