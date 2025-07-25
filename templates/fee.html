@@ -904,7 +904,7 @@ async function searchFeeData() {
                 branchName: apiData.settings.branch_name,
                 startDate: apiData.settings.effective_from,
                 endDate: apiData.settings.effective_to || '',
-                description: apiData.settings.note || `${apiData.settings.company_name} ${apiData.settings.branch_name}점 수수료 기준`,
+                description: apiData.settings.note || `${apiData.settings.company_name} ${apiData.settings.branch_name} 수수료 기준`,
                 discountRate: (apiData.settings.free_rate_threshold * 100).toFixed(1),
                 categoryFees: apiData.category_fees ? apiData.category_fees.map(fee => ({
                     id: fee.id,
@@ -1033,7 +1033,7 @@ function showSampleTable(data = null) {
 function addNewRow() {
     const tbody = document.getElementById('feeTableBody');
     if (!tbody) {
-        showNotification('먼저 데이터를 조회하거나 템플릿을 업로드해주세요.', 'warning');
+        showNotification('해당 기능은 아직 구현되지 않았습니다.', 'warning');
         return;
     }
     
@@ -1092,7 +1092,7 @@ async function saveChanges() {
     const modifiedRows = document.querySelectorAll('.table-info, .table-warning');
     
     if (modifiedRows.length === 0) {
-        showNotification('변경된 데이터가 없습니다.', 'warning');
+        showNotification('해당 기능은 아직 구현되지 않았습니다.', 'warning');
         return;
     }
     
