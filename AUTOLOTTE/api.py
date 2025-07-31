@@ -95,21 +95,76 @@ class LotteAPI:
             'X-Requested-With': 'Fetch',
             'uiId': 'MP030213M01',
             'guid': '20250430UIFT301912____14355574342060001',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         }
     
     def _make_api_request(self, url, payload, headers, request_type):
         """API 요청 실행"""
         try:
+            # 요청 전 쿠키 정보 출력
+            print(f"🔍 {request_type} 요청 전 세션 쿠키:")
+            for cookie in self.session.cookies:
+                print(f"  - {cookie.name}: {cookie.value[:20]}...")
+            
             response = self.session.post(url, data=payload, headers=headers)
             
             if response.status_code == 200:
                 print(f"✅ {request_type} 매출 데이터 응답 수신 성공 (길이: {len(response.text)} bytes)")
+                
+                # 응답 내용을 파일로 저장 (디버깅용)
+                filename = f'{request_type}_response.xml'
+                with open(filename, 'w', encoding='utf-8') as f:
+                    f.write(response.text)
+                print(f"📄 응답 내용이 {filename}에 저장되었습니다")
+                
+                # 세션 만료 확인
+                if self._is_session_expired_response(response.text):
+                    print(f"❌ {request_type} 조회 중 세션 만료 감지")
+                    return None
+                
                 return response.text
             else:
                 print(f"❌ {request_type} 매출 조회 실패: {response.status_code}")
                 print(f"응답: {response.text}")
+                
+                # 실패 응답도 저장
+                filename = f'{request_type}_error_response.xml'
+                with open(filename, 'w', encoding='utf-8') as f:
+                    f.write(response.text)
+                print(f"📄 오류 응답이 {filename}에 저장되었습니다")
+                
                 return None
                 
         except requests.exceptions.RequestException as e:
             print(f"❌ 네트워크 오류: {str(e)}")
-            return None
+            return None    
+    def _is_session_expired_response(self, response_text):
+        """응답에서 세션 만료 여부 확인"""
+        # ErrorCode가 0이 아닌 경우만 세션 만료로 판단
+        if "ErrorCode" in response_text:
+            # ErrorCode 값 추출
+            import re
+            error_code_match = re.search(r'<Parameter id="ErrorCode"[^>]*>(\d+)</Parameter>', response_text)
+            if error_code_match:
+                error_code = int(error_code_match.group(1))
+                if error_code != 0:
+                    print(f"🔍 ErrorCode 감지: {error_code}")
+                    return True
+                else:
+                    print(f"✅ ErrorCode 정상: {error_code}")
+                    return False
+        
+        # 기타 세션 만료 키워드 확인
+        session_expired_keywords = [
+            "SESSION이 존재하지 않습니다",
+            "세션이 만료되었습니다",
+            "로그인이 필요합니다",
+            "인증이 실패했습니다"
+        ]
+        
+        for keyword in session_expired_keywords:
+            if keyword in response_text:
+                print(f"🔍 세션 만료 키워드 감지: {keyword}")
+                return True
+        
+        return False

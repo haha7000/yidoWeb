@@ -1,4 +1,4 @@
-#!/Users/gimdonghun/Documents/DbTest/venv/bin/python3.11
+#!/Users/gimdonghun/Documents/yidoweb/dbtest/venv/bin/python3.11
 #
 # dumppdf.py - dump pdf contents in XML format.
 #

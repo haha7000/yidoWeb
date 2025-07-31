@@ -1,15 +1,8 @@
 #!/bin/bash
-
-echo "롯데면세점 매출 데이터 자동 스케줄러 시작"
-echo "====================================="
-
-# Python 가상환경 활성화 (필요한 경우)
-# source venv/bin/activate
-
-# 패키지 설치
-echo "필요한 패키지를 설치합니다..."
-pip install -r requirements.txt
-
-# 스케줄러 실행
-echo "스케줄러를 시작합니다..."
+cd /Users/ec2-user/yido/yidoweb/dbtest/AUTOLOTTE
+source /Users/ec2-user/yido/yidoweb/dbtest/venv/bin/activate
+export PYTHONPATH=/Users/ec2-user/yido/yidoweb/dbtest
+export LOTTE_DB_URL=postgresql://test_user:0000@localhost:5432/my_test_db
+export LOTTE_USER_ID=T301912
+export LOTTE_PASSWORD=huixin210@
 python scheduler.py

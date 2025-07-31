@@ -131,3 +131,83 @@ async def delete_uploaded_fees(
             "success": False,
             "message": f"수수료 설정 삭제 중 오류가 발생했습니다: {str(e)}"
         }, status_code=500)
+
+@router.put("/api/fees/settings/{settings_id}")
+async def update_fee_settings(
+    settings_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    """수수료 설정 정보 수정"""
+    try:
+        # 요청 body에서 수정할 데이터 받기
+        body = await request.json()
+        
+        with SessionLocal() as db:
+            # 1. 권한 확인
+            check_query = """
+            SELECT id FROM fee_settings 
+            WHERE id = :settings_id AND creator_id = :user_id
+            """
+            
+            result = db.execute(text(check_query), {
+                "settings_id": settings_id,
+                "user_id": current_user.id
+            }).first()
+            
+            if not result:
+                return JSONResponse({
+                    "success": False,
+                    "message": "권한이 없거나 존재하지 않는 수수료 설정입니다."
+                }, status_code=403)
+            
+            # 2. 수정할 필드들 구성
+            update_fields = []
+            params = {"settings_id": settings_id}
+            
+            if "company_name" in body:
+                update_fields.append("company_name = :company_name")
+                params["company_name"] = body["company_name"]
+            
+            if "branch_name" in body:
+                update_fields.append("branch_name = :branch_name")
+                params["branch_name"] = body["branch_name"]
+            
+            if "effective_from" in body:
+                update_fields.append("effective_from = :effective_from")
+                params["effective_from"] = body["effective_from"]
+            
+            if "effective_to" in body:
+                update_fields.append("effective_to = :effective_to")
+                params["effective_to"] = body["effective_to"]
+            
+            if "note" in body:
+                update_fields.append("note = :note")
+                params["note"] = body["note"]
+            
+            if not update_fields:
+                return JSONResponse({
+                    "success": False,
+                    "message": "수정할 데이터가 없습니다."
+                }, status_code=400)
+            
+            # 3. 업데이트 실행
+            update_query = f"""
+            UPDATE fee_settings 
+            SET {', '.join(update_fields)}, updated_at = CURRENT_TIMESTAMP
+            WHERE id = :settings_id
+            """
+            
+            db.execute(text(update_query), params)
+            db.commit()
+            
+            return JSONResponse({
+                "success": True,
+                "message": "수수료 설정이 성공적으로 수정되었습니다."
+            })
+            
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "message": f"수수료 설정 수정 중 오류가 발생했습니다: {str(e)}"
+        }, status_code=500)

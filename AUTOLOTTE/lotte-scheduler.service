@@ -1,0 +1,29 @@
+[Unit]
+Description=Lotte Duty Free Auto Pipeline Scheduler
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/yidoweb/dbtest/AUTOLOTTE
+ExecStart=/usr/bin/python3 /home/ubuntu/yidoweb/dbtest/AUTOLOTTE/scheduler.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# 환경 변수 설정
+Environment=PYTHONPATH=/home/ubuntu/yidoweb/dbtest/AUTOLOTTE
+Environment=LOTTE_DB_URL=postgresql://test_user:test_password@localhost:5432/my_test_db
+Environment=LOTTE_USER_ID=T301912
+Environment=LOTTE_PASSWORD=huixin210@
+
+# 보안 설정
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/ubuntu/yidoweb/dbtest/AUTOLOTTE/logs
+
+[Install]
+WantedBy=multi-user.target 

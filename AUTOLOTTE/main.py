@@ -9,7 +9,7 @@ def main():
     
     # 로그인
     print("🔐 로그인 중...")
-    if not scraper.login('T301912', 'huixin210@@'):
+    if not scraper.login('T301912', 'huixin210@'):
         print("❌ 로그인 실패로 작업을 중단합니다.")
         return
     
@@ -32,7 +32,7 @@ def main():
             print("❌ 엑셀 저장 실패")
     
     else:
-        print("❌ 상품별 매출 데이터 조회 실패")
+        print("❌ 상품별 매출 데이터 조회 실패 (세션 갱신 후에도 실패)")
         
         # 2단계: 브랜드별 조회로 폴백
         print("\n🔄 브랜드별 조회로 폴백...")
@@ -50,7 +50,7 @@ def main():
             else:
                 print("❌ 엑셀 저장 실패")
         else:
-            print("❌ 모든 매출 데이터 조회 실패")
+            print("❌ 모든 매출 데이터 조회 실패 (세션 갱신 후에도 실패)")
     
     print("\n" + "=" * 50)
     print("✅ 작업 완료!")
@@ -74,9 +74,46 @@ def test_with_manual_cookies():
     if sales_data:
         scraper.save_to_excel(filename="수동쿠키_매출데이터.xlsx")
 
-if __name__ == "__main__":
-    # 일반 로그인 방식
-    main()
+def debug_session():
+    """세션 디버깅 전용 함수"""
+    scraper = LotteDutyFreeSales()
     
-    # 수동 쿠키 방식이 필요한 경우 아래 주석 해제
-    # test_with_manual_cookies()
+    print("🔍 세션 디버깅 모드")
+    print("=" * 50)
+    
+    # 로그인
+    print("🔐 로그인 중...")
+    if not scraper.login('T301912', 'huixin210@'):
+        print("❌ 로그인 실패")
+        return
+    
+    # 세션 상태 확인
+    print("\n🔍 세션 상태 확인...")
+    scraper.auth.validate_session()
+    
+    # 간단한 API 요청으로 세션 테스트
+    print("\n🧪 세션 테스트...")
+    sales_data = scraper.fetch_brand_sales()
+    
+    if sales_data:
+        print("✅ 세션 테스트 성공")
+    else:
+        print("❌ 세션 테스트 실패")
+
+if __name__ == "__main__":
+    import sys
+    
+    if len(sys.argv) > 1:
+        mode = sys.argv[1]
+        if mode == "debug":
+            debug_session()
+        elif mode == "manual":
+            test_with_manual_cookies()
+        else:
+            print("사용법: python3 main.py [debug|manual]")
+            print("  debug: 세션 디버깅 모드")
+            print("  manual: 수동 쿠키 테스트 모드")
+            print("  (인수 없음): 일반 실행 모드")
+    else:
+        # 일반 로그인 방식
+        main()

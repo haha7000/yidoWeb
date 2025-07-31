@@ -1,0 +1,1159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Root xmlns="http://www.nexacroplatform.com/platform/dataset">
+	<Parameters>
+		<Parameter id="ErrorCode" type="int">0</Parameter>
+	</Parameters>
+	<Dataset id="ds_taySmgRltmSalesList">
+		<ColumnInfo>
+			<Column id="_chk" type="string" size="32"/>
+			<Column id="_userLangCd" type="string" size="32"/>
+			<Column id="_userNatnCd" type="string" size="32"/>
+			<Column id="_usrId" type="string" size="32"/>
+			<Column id="brndNm" type="string" size="32"/>
+			<Column id="brndcd" type="string" size="32"/>
+			<Column id="cateNm" type="string" size="32"/>
+			<Column id="custNm" type="string" size="32"/>
+			<Column id="dlrNsalamt" type="bigdecimal" size="16"/>
+			<Column id="dlrTotDcAmt" type="bigdecimal" size="16"/>
+			<Column id="dlrTotSalamt" type="bigdecimal" size="16"/>
+			<Column id="dlvrDvsCd" type="string" size="32"/>
+			<Column id="dlvrplcAddr" type="string" size="32"/>
+			<Column id="entshpTaycd" type="string" size="32"/>
+			<Column id="exchNo" type="string" size="32"/>
+			<Column id="gdeNm" type="string" size="32"/>
+			<Column id="gdecd" type="string" size="32"/>
+			<Column id="grpNo" type="string" size="32"/>
+			<Column id="grpTypeNm" type="string" size="32"/>
+			<Column id="imptLocalDvsCd" type="string" size="32"/>
+			<Column id="oflnFwdCntncd" type="string" size="32"/>
+			<Column id="onlnFwdChgpsnNm" type="string" size="32"/>
+			<Column id="onlnFwdCntadr" type="string" size="32"/>
+			<Column id="prdcd" type="string" size="32"/>
+			<Column id="prodNm" type="string" size="32"/>
+			<Column id="psptno" type="string" size="32"/>
+			<Column id="rcrtcustRgnCd" type="string" size="32"/>
+			<Column id="recvPsnNm" type="string" size="32"/>
+			<Column id="refno" type="string" size="32"/>
+			<Column id="rmks" type="string" size="32"/>
+			<Column id="slDt" type="string" size="32"/>
+			<Column id="slQty" type="string" size="32"/>
+			<Column id="strCd" type="string" size="32"/>
+			<Column id="tayNm" type="string" size="32"/>
+			<Column id="wonNsalamt" type="bigdecimal" size="16"/>
+			<Column id="wonTotDcAmt" type="bigdecimal" size="16"/>
+			<Column id="wonTotSalamt" type="bigdecimal" size="16"/>
+		</ColumnInfo>
+		<Rows>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LI&#32;HUIZHEN</Col>
+				<Col id="dlrNsalamt">34</Col>
+				<Col id="dlrTotDcAmt">2</Col>
+				<Col id="dlrTotSalamt">36</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136425037316</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146693</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2073417653</Col>
+				<Col id="prodNm">OMB.ESS.NEW&#32;RGE&#32;CUIR&#32;244</Col>
+				<Col id="psptno">EN7281190</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">181244</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">46784</Col>
+				<Col id="wonTotDcAmt">2752</Col>
+				<Col id="wonTotSalamt">49536</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">MIU&#32;MIU</Col>
+				<Col id="brndcd">181733</Col>
+				<Col id="cateNm">FASHION</Col>
+				<Col id="custNm">ZHANG&#32;YAN</Col>
+				<Col id="dlrNsalamt">446</Col>
+				<Col id="dlrTotDcAmt">24</Col>
+				<Col id="dlrTotSalamt">470</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90114125009983</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146683</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2073539725</Col>
+				<Col id="prodNm">E5AK&#32;FRAMES&#32;ORO</Col>
+				<Col id="psptno">EC6175843</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">SMUA51C075&#32;E5AK&#32;FE20P-252</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">613696</Col>
+				<Col id="wonTotDcAmt">33024</Col>
+				<Col id="wonTotSalamt">646720</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LI&#32;HUIZHEN</Col>
+				<Col id="dlrNsalamt">140</Col>
+				<Col id="dlrTotDcAmt">7</Col>
+				<Col id="dlrTotSalamt">147</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136425037316</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146693</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2071609991</Col>
+				<Col id="prodNm">SUBLIMAGE&#32;L&apos;ESSENCE&#32;DE&#32;TEINT&#32;BD01</Col>
+				<Col id="psptno">EN7281190</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">147115</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">192618</Col>
+				<Col id="wonTotDcAmt">9632</Col>
+				<Col id="wonTotSalamt">202250</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">CHEN&#32;LICHUN</Col>
+				<Col id="dlrNsalamt">108</Col>
+				<Col id="dlrTotDcAmt">6</Col>
+				<Col id="dlrTotSalamt">114</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136825032425</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141431</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2072373082</Col>
+				<Col id="prodNm">RA&#32;VELVET&#32;INTEMPORELLE&#32;60</Col>
+				<Col id="psptno">EE3312975</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">162607</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">3</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">148608</Col>
+				<Col id="wonTotDcAmt">8256</Col>
+				<Col id="wonTotSalamt">156864</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LI&#32;JIAN</Col>
+				<Col id="dlrNsalamt">72</Col>
+				<Col id="dlrTotDcAmt">4</Col>
+				<Col id="dlrTotSalamt">76</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136425037323</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146665</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2071165466</Col>
+				<Col id="prodNm">ROUGE&#32;COCO&#32;FLASH&#32;MOVE&#32;144/3g</Col>
+				<Col id="psptno">EE5163846</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">174144</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">2</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">99072</Col>
+				<Col id="wonTotDcAmt">5504</Col>
+				<Col id="wonTotSalamt">104576</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">JIN&#32;MENGMENG</Col>
+				<Col id="dlrNsalamt">102</Col>
+				<Col id="dlrTotDcAmt">5</Col>
+				<Col id="dlrTotSalamt">107</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136425037324</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146683</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2067456868</Col>
+				<Col id="prodNm">LE&#32;BLANC&#32;HUILE&#32;50ml</Col>
+				<Col id="psptno">EJ7091872</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">141260</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">140350</Col>
+				<Col id="wonTotDcAmt">6880</Col>
+				<Col id="wonTotSalamt">147230</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">C.DIOR</Col>
+				<Col id="brndcd">000266</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LE&#32;THITHANHMAI</Col>
+				<Col id="dlrNsalamt">90</Col>
+				<Col id="dlrTotDcAmt">6</Col>
+				<Col id="dlrTotSalamt">96</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90108025022576</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141436</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2073473405</Col>
+				<Col id="prodNm">DA&#32;LIP&#32;GLW&#32;075&#32;INT25</Col>
+				<Col id="psptno">C8843149</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">C045700075</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">3</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">123840</Col>
+				<Col id="wonTotDcAmt">8256</Col>
+				<Col id="wonTotSalamt">132096</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHRISTIAN&#32;LOUBOUTIN</Col>
+				<Col id="brndcd">302993</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">XIN&#32;XIUPING</Col>
+				<Col id="dlrNsalamt">29</Col>
+				<Col id="dlrTotDcAmt">86</Col>
+				<Col id="dlrTotSalamt">115</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90140025000332</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141685</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2072816510</Col>
+				<Col id="prodNm">CLB&#32;RENO&#32;LS&#32;MAT&#32;BARE&#32;ROCOCOTTE&#32;013M</Col>
+				<Col id="psptno">EJ8283757</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">65184326</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">39904</Col>
+				<Col id="wonTotDcAmt">118336</Col>
+				<Col id="wonTotSalamt">158240</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHRISTIAN&#32;LOUBOUTIN</Col>
+				<Col id="brndcd">302993</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">XIN&#32;XIUPING</Col>
+				<Col id="dlrNsalamt">14</Col>
+				<Col id="dlrTotDcAmt">42</Col>
+				<Col id="dlrTotSalamt">56</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90140025000333</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141685</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2073372371</Col>
+				<Col id="prodNm">CLB&#32;ABRACADABRA&#32;DUO&#32;LADY&#32;KHAKI&#32;EYESHADOW</Col>
+				<Col id="psptno">EJ8283757</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">65181214</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">19264</Col>
+				<Col id="wonTotDcAmt">57792</Col>
+				<Col id="wonTotSalamt">77056</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LI&#32;HUIZHEN</Col>
+				<Col id="dlrNsalamt">37</Col>
+				<Col id="dlrTotDcAmt">2</Col>
+				<Col id="dlrTotSalamt">39</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136425037319</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146693</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2072495807</Col>
+				<Col id="prodNm">LE&#32;ROUGE&#32;DUO&#32;U.TENUE&#32;B.&#32;RED&#32;176</Col>
+				<Col id="psptno">EN7281190</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">175176</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">50900</Col>
+				<Col id="wonTotDcAmt">2752</Col>
+				<Col id="wonTotSalamt">53652</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LI&#32;HUIZHEN</Col>
+				<Col id="dlrNsalamt">168</Col>
+				<Col id="dlrTotDcAmt">9</Col>
+				<Col id="dlrTotSalamt">177</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136425037316</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146693</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2073502963</Col>
+				<Col id="prodNm">ECLAT&#32;PREMIER&#32;LA&#32;BASE&#32;ROSEE&#32;30ml</Col>
+				<Col id="psptno">EN7281190</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">167370</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">3</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">231168</Col>
+				<Col id="wonTotDcAmt">12384</Col>
+				<Col id="wonTotSalamt">243552</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">SHAO&#32;YALI</Col>
+				<Col id="dlrNsalamt">102</Col>
+				<Col id="dlrTotDcAmt">5</Col>
+				<Col id="dlrTotSalamt">107</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136425037322</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141411</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2067456868</Col>
+				<Col id="prodNm">LE&#32;BLANC&#32;HUILE&#32;50ml</Col>
+				<Col id="psptno">EP2228797</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">141260</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">140350</Col>
+				<Col id="wonTotDcAmt">6880</Col>
+				<Col id="wonTotSalamt">147230</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">C.DIOR</Col>
+				<Col id="brndcd">000266</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LE&#32;THITHANHMAI</Col>
+				<Col id="dlrNsalamt">174</Col>
+				<Col id="dlrTotDcAmt">9</Col>
+				<Col id="dlrTotSalamt">183</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90108025022576</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141436</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2073483618</Col>
+				<Col id="prodNm">DA&#32;LIP&#32;GLOW&#32;DUO&#32;TRAVEL&#32;25</Col>
+				<Col id="psptno">C8843149</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">E000000127</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">3</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">239424</Col>
+				<Col id="wonTotDcAmt">12384</Col>
+				<Col id="wonTotSalamt">251808</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">C.DIOR</Col>
+				<Col id="brndcd">000266</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LE&#32;THITHANHMAI</Col>
+				<Col id="dlrNsalamt">93</Col>
+				<Col id="dlrTotDcAmt">6</Col>
+				<Col id="dlrTotSalamt">99</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90108025022576</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141436</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2073473391</Col>
+				<Col id="prodNm">ADD&#32;LIP&#32;MAX&#32;029&#32;INT23</Col>
+				<Col id="psptno">C8843149</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">C031900029</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">3</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">127968</Col>
+				<Col id="wonTotDcAmt">8256</Col>
+				<Col id="wonTotSalamt">136224</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">C.DIOR</Col>
+				<Col id="brndcd">000266</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">HOU&#32;WENYING</Col>
+				<Col id="dlrNsalamt">-102</Col>
+				<Col id="dlrTotDcAmt">-6</Col>
+				<Col id="dlrTotSalamt">-108</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136625012393</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146658</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2071942791</Col>
+				<Col id="prodNm">ADD&#32;LIPSTICK&#32;720&#32;INT22</Col>
+				<Col id="psptno">EG0637639</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">C029100720</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">-3</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">-139607</Col>
+				<Col id="wonTotDcAmt">-8212</Col>
+				<Col id="wonTotSalamt">-147819</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">ROGER&#32;VIVIER</Col>
+				<Col id="brndcd">300909</Col>
+				<Col id="cateNm">FASHION</Col>
+				<Col id="custNm">HUANG&#32;JICHUN</Col>
+				<Col id="dlrNsalamt">791</Col>
+				<Col id="dlrTotDcAmt">0</Col>
+				<Col id="dlrTotSalamt">791</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90119525003008</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146688</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2067138740</Col>
+				<Col id="prodNm">DEC.TROMPETTE&#32;T.45</Col>
+				<Col id="psptno">EP8105437</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">RVW44815280D1PC415</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">1088416</Col>
+				<Col id="wonTotDcAmt">0</Col>
+				<Col id="wonTotSalamt">1088416</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">HERMES</Col>
+				<Col id="brndcd">000227</Col>
+				<Col id="cateNm">FASHION</Col>
+				<Col id="custNm">WANG&#32;MIN</Col>
+				<Col id="dlrNsalamt">7397</Col>
+				<Col id="dlrTotDcAmt">0</Col>
+				<Col id="dlrTotSalamt">7397</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90109225004565</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141421</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2072690936</Col>
+				<Col id="prodNm">38&#32;M&#32;BELT&#32;LEATHER&#32;STRAP&#32;CROCODILE&#32;POROSUS&#32;MAT&#32;NOIR&#32;090&#32;CROCODILE&#32;POROSUS&#32;MAT</Col>
+				<Col id="psptno">EK8998416</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">079639CA</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">10178250</Col>
+				<Col id="wonTotDcAmt">0</Col>
+				<Col id="wonTotSalamt">10178250</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LI&#32;HUIZHEN</Col>
+				<Col id="dlrNsalamt">126</Col>
+				<Col id="dlrTotDcAmt">6</Col>
+				<Col id="dlrTotSalamt">132</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136425037316</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146693</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2072093829</Col>
+				<Col id="prodNm">ROUGE&#32;ALLURE&#32;L&apos;EXTRAIT&#32;S.812</Col>
+				<Col id="psptno">EN7281190</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">163812</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">3</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">173376</Col>
+				<Col id="wonTotDcAmt">8256</Col>
+				<Col id="wonTotSalamt">181632</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LI&#32;HUIZHEN</Col>
+				<Col id="dlrNsalamt">39</Col>
+				<Col id="dlrTotDcAmt">2</Col>
+				<Col id="dlrTotSalamt">41</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136425037316</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146693</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2071908872</Col>
+				<Col id="prodNm">N1&#32;DE&#32;CHANEL&#32;BALM&#32;LIVELY&#32;ROSEW&#32;5</Col>
+				<Col id="psptno">EN7281190</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">145384</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">53664</Col>
+				<Col id="wonTotDcAmt">2752</Col>
+				<Col id="wonTotSalamt">56416</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">JIN&#32;GUIJUAN</Col>
+				<Col id="dlrNsalamt">102</Col>
+				<Col id="dlrTotDcAmt">5</Col>
+				<Col id="dlrTotSalamt">107</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136825032424</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141431</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2067456868</Col>
+				<Col id="prodNm">LE&#32;BLANC&#32;HUILE&#32;50ml</Col>
+				<Col id="psptno">EL6359630</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">141260</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">140352</Col>
+				<Col id="wonTotDcAmt">6880</Col>
+				<Col id="wonTotSalamt">147232</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">JIN&#32;GUIJUAN</Col>
+				<Col id="dlrNsalamt">108</Col>
+				<Col id="dlrTotDcAmt">6</Col>
+				<Col id="dlrTotSalamt">114</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136825032424</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141431</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2072373082</Col>
+				<Col id="prodNm">RA&#32;VELVET&#32;INTEMPORELLE&#32;60</Col>
+				<Col id="psptno">EL6359630</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">162607</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">3</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">148608</Col>
+				<Col id="wonTotDcAmt">8256</Col>
+				<Col id="wonTotSalamt">156864</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">JIN&#32;CHUNSHI</Col>
+				<Col id="dlrNsalamt">37</Col>
+				<Col id="dlrTotDcAmt">2</Col>
+				<Col id="dlrTotSalamt">39</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136825032419</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146657</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2072784826</Col>
+				<Col id="prodNm">LE&#32;ROUGE&#32;DUO&#32;LIGHT&#32;BROWN&#32;182</Col>
+				<Col id="psptno">EE6933491</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">175182</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">50912</Col>
+				<Col id="wonTotDcAmt">2752</Col>
+				<Col id="wonTotSalamt">53664</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHAUMET</Col>
+				<Col id="brndcd">209963</Col>
+				<Col id="cateNm">JEW&#32;and&#32;WATCH</Col>
+				<Col id="custNm">DAI&#32;WANGWANG</Col>
+				<Col id="dlrNsalamt">8740</Col>
+				<Col id="dlrTotDcAmt">0</Col>
+				<Col id="dlrTotSalamt">8740</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90106125003981</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146620</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2073538751</Col>
+				<Col id="prodNm">SOL&#32;JOS&#32;AIG&#32;CER&#32;PT&#32;D&#32;CTR&#32;DIA&#32;PEA&#32;0.5</Col>
+				<Col id="psptno">EE5009991</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">J84092-050-7496933887</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">12026240</Col>
+				<Col id="wonTotDcAmt">0</Col>
+				<Col id="wonTotSalamt">12026240</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LI&#32;HUIZHEN</Col>
+				<Col id="dlrNsalamt">102</Col>
+				<Col id="dlrTotDcAmt">5</Col>
+				<Col id="dlrTotSalamt">107</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136425037316</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146693</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2067456868</Col>
+				<Col id="prodNm">LE&#32;BLANC&#32;HUILE&#32;50ml</Col>
+				<Col id="psptno">EN7281190</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">141260</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">140352</Col>
+				<Col id="wonTotDcAmt">6880</Col>
+				<Col id="wonTotSalamt">147232</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHRISTIAN&#32;LOUBOUTIN</Col>
+				<Col id="brndcd">302993</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">XIN&#32;XIUPING</Col>
+				<Col id="dlrNsalamt">174</Col>
+				<Col id="dlrTotDcAmt">516</Col>
+				<Col id="dlrTotSalamt">690</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90140025000331</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141685</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2073011877</Col>
+				<Col id="prodNm">CLB&#32;RENO&#32;LS&#32;MAT&#32;EPIC&#32;BRUNETTE&#32;318M</Col>
+				<Col id="psptno">EJ8283757</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">65184333</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">6</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">239424</Col>
+				<Col id="wonTotDcAmt">710016</Col>
+				<Col id="wonTotSalamt">949440</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHRISTIAN&#32;LOUBOUTIN</Col>
+				<Col id="brndcd">302993</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">XIN&#32;XIUPING</Col>
+				<Col id="dlrNsalamt">14</Col>
+				<Col id="dlrTotDcAmt">42</Col>
+				<Col id="dlrTotSalamt">56</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90140025000333</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141685</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2073372367</Col>
+				<Col id="prodNm">CLB&#32;ABRACADABRA&#32;DUO&#32;PLUMINETTE&#32;MAUVE&#32;EYESHADOW</Col>
+				<Col id="psptno">EJ8283757</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">65181210</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">19264</Col>
+				<Col id="wonTotDcAmt">57792</Col>
+				<Col id="wonTotSalamt">77056</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">JIN&#32;CHUNSHI</Col>
+				<Col id="dlrNsalamt">102</Col>
+				<Col id="dlrTotDcAmt">5</Col>
+				<Col id="dlrTotSalamt">107</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136425037314</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146657</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2067456868</Col>
+				<Col id="prodNm">LE&#32;BLANC&#32;HUILE&#32;50ml</Col>
+				<Col id="psptno">EE6933491</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">141260</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">140352</Col>
+				<Col id="wonTotDcAmt">6880</Col>
+				<Col id="wonTotSalamt">147232</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">CHEN&#32;LICHUN</Col>
+				<Col id="dlrNsalamt">102</Col>
+				<Col id="dlrTotDcAmt">5</Col>
+				<Col id="dlrTotSalamt">107</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136825032425</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141431</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2067456868</Col>
+				<Col id="prodNm">LE&#32;BLANC&#32;HUILE&#32;50ml</Col>
+				<Col id="psptno">EE3312975</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">141260</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">140352</Col>
+				<Col id="wonTotDcAmt">6880</Col>
+				<Col id="wonTotSalamt">147232</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LI&#32;JIAN</Col>
+				<Col id="dlrNsalamt">36</Col>
+				<Col id="dlrTotDcAmt">2</Col>
+				<Col id="dlrTotSalamt">38</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136425037323</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146665</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2071910431</Col>
+				<Col id="prodNm">RA&#32;LAQUE&#32;BEIGE&#32;SECRET&#32;83</Col>
+				<Col id="psptno">EE5163846</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">165083</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">48292</Col>
+				<Col id="wonTotDcAmt">2752</Col>
+				<Col id="wonTotSalamt">51044</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">C.DIOR</Col>
+				<Col id="brndcd">000266</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LE&#32;THITHANHMAI</Col>
+				<Col id="dlrNsalamt">204</Col>
+				<Col id="dlrTotDcAmt">12</Col>
+				<Col id="dlrTotSalamt">216</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90108025022576</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141436</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2073483620</Col>
+				<Col id="prodNm">RD&#32;LIP&#32;DUO&#32;TRAVEL&#32;25</Col>
+				<Col id="psptno">C8843149</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">E000000223</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">3</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">280660</Col>
+				<Col id="wonTotDcAmt">16512</Col>
+				<Col id="wonTotSalamt">297172</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">C.DIOR</Col>
+				<Col id="brndcd">000266</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LE&#32;THITHANHMAI</Col>
+				<Col id="dlrNsalamt">90</Col>
+				<Col id="dlrTotDcAmt">6</Col>
+				<Col id="dlrTotSalamt">96</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90108025022576</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141436</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2073503588</Col>
+				<Col id="prodNm">DA&#32;LIP&#32;GLW&#32;BUTTER&#32;101&#32;INT25</Col>
+				<Col id="psptno">C8843149</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">E000000588</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">3</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">123840</Col>
+				<Col id="wonTotDcAmt">8256</Col>
+				<Col id="wonTotSalamt">132096</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">C.DIOR</Col>
+				<Col id="brndcd">000266</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LE&#32;THITHANHMAI</Col>
+				<Col id="dlrNsalamt">93</Col>
+				<Col id="dlrTotDcAmt">6</Col>
+				<Col id="dlrTotSalamt">99</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90108025022576</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141436</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2072363076</Col>
+				<Col id="prodNm">ADD&#32;LIP&#32;MAX&#32;009&#32;INT23</Col>
+				<Col id="psptno">C8843149</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">C031900009</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">3</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">127968</Col>
+				<Col id="wonTotDcAmt">8256</Col>
+				<Col id="wonTotSalamt">136224</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHRISTIAN&#32;LOUBOUTIN</Col>
+				<Col id="brndcd">302993</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">XIN&#32;XIUPING</Col>
+				<Col id="dlrNsalamt">29</Col>
+				<Col id="dlrTotDcAmt">86</Col>
+				<Col id="dlrTotSalamt">115</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90140025000333</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141685</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2073011877</Col>
+				<Col id="prodNm">CLB&#32;RENO&#32;LS&#32;MAT&#32;EPIC&#32;BRUNETTE&#32;318M</Col>
+				<Col id="psptno">EJ8283757</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">65184333</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">39904</Col>
+				<Col id="wonTotDcAmt">118336</Col>
+				<Col id="wonTotSalamt">158240</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LI&#32;HUIZHEN</Col>
+				<Col id="dlrNsalamt">52</Col>
+				<Col id="dlrTotDcAmt">3</Col>
+				<Col id="dlrTotSalamt">55</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136425037316</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146693</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2067229035</Col>
+				<Col id="prodNm">CC&#32;CREAM&#32;B10</Col>
+				<Col id="psptno">EN7281190</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">140555</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">71552</Col>
+				<Col id="wonTotDcAmt">4128</Col>
+				<Col id="wonTotSalamt">75680</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHANEL</Col>
+				<Col id="brndcd">000263</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">LI&#32;HUIZHEN</Col>
+				<Col id="dlrNsalamt">36</Col>
+				<Col id="dlrTotDcAmt">2</Col>
+				<Col id="dlrTotSalamt">38</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90136425037316</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146693</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2071944542</Col>
+				<Col id="prodNm">ROUGE&#32;ALL.LAQUE&#32;ROSE&#32;AMBIGU&#32;84</Col>
+				<Col id="psptno">EN7281190</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">165084</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">49536</Col>
+				<Col id="wonTotDcAmt">2752</Col>
+				<Col id="wonTotSalamt">52288</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">MIU&#32;MIU</Col>
+				<Col id="brndcd">181733</Col>
+				<Col id="cateNm">FASHION</Col>
+				<Col id="custNm">HUANG&#32;JICHUN</Col>
+				<Col id="dlrNsalamt">893</Col>
+				<Col id="dlrTotDcAmt">47</Col>
+				<Col id="dlrTotSalamt">940</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90114125009982</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25146688</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2073495886</Col>
+				<Col id="prodNm">3L48&#32;VIT.SOFT&#32;BICOLORE</Col>
+				<Col id="psptno">EP8105437</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">5E387EF005&#32;3L48&#32;F0TPR-251</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">1</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">1228768</Col>
+				<Col id="wonTotDcAmt">64672</Col>
+				<Col id="wonTotSalamt">1293440</Col>
+			</Row>
+			<Row>
+				<Col id="_chk">0</Col>
+				<Col id="brndNm">CHRISTIAN&#32;LOUBOUTIN</Col>
+				<Col id="brndcd">302993</Col>
+				<Col id="cateNm">COS&#32;and&#32;PFM</Col>
+				<Col id="custNm">XIN&#32;XIUPING</Col>
+				<Col id="dlrNsalamt">145</Col>
+				<Col id="dlrTotDcAmt">430</Col>
+				<Col id="dlrTotSalamt">575</Col>
+				<Col id="dlvrDvsCd">11</Col>
+				<Col id="entshpTaycd">301912</Col>
+				<Col id="exchNo">90140025000333</Col>
+				<Col id="gdeNm">롯데면세점7</Col>
+				<Col id="gdecd">043076</Col>
+				<Col id="grpNo">25141685</Col>
+				<Col id="grpTypeNm">일반단체</Col>
+				<Col id="imptLocalDvsCd">수입</Col>
+				<Col id="prdcd">2072816572</Col>
+				<Col id="prodNm">CLB&#32;RENO&#32;LS&#32;MAT&#32;BURNING&#32;BABE&#32;415M</Col>
+				<Col id="psptno">EJ8283757</Col>
+				<Col id="rcrtcustRgnCd">4</Col>
+				<Col id="refno">65184335</Col>
+				<Col id="slDt">20250729</Col>
+				<Col id="slQty">5</Col>
+				<Col id="strCd">901</Col>
+				<Col id="tayNm">주식회사&#32;혜신</Col>
+				<Col id="wonNsalamt">199520</Col>
+				<Col id="wonTotDcAmt">591680</Col>
+				<Col id="wonTotSalamt">791200</Col>
+			</Row>
+		</Rows>
+	</Dataset>
+</Root>

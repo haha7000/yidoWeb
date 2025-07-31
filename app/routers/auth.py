@@ -30,6 +30,11 @@ def register_page(request: Request):
     """회원가입 페이지"""
     return templates.TemplateResponse("register.html", {"request": request})
 
+@router.get("/login/")
+def login_page(request: Request):
+    """로그인 페이지"""
+    return templates.TemplateResponse("login.html", {"request": request})
+
 @router.post("/register/")
 async def register_user(
     request: Request,

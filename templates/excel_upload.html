@@ -29,9 +29,9 @@
                         <li>엑셀 파일 형식: .xlsx 또는 .xls</li>
                         <li>필수 컬럼: 
                             {% if duty_free_value == "lotte" %}
-                            교환권번호(receiptNumber), 고객명(name), PayBack
+                            교환권번호(receiptNumber), 고객명(name)
                             {% else %}
-                            BILL 번호(receiptNumber), 고객명(name), 수수료(PayBack)
+                            BILL 번호(receiptNumber), 고객명(name)
                             {% endif %}
                         </li>
                         <li>기존 데이터는 유지되며, 새로운 데이터가 추가됩니다</li>
@@ -90,7 +90,7 @@
                             <ul class="mb-0 small">
                                 <li><strong>영수증 번호:</strong> 14자리 숫자 (예: 90208724000593)</li>
                                 <li><strong>파일 구조:</strong> 멀티헤더 엑셀 파일 지원</li>
-                                <li><strong>컬럼명:</strong> 교환권번호, 고객명, PayBack(환급/수수료)</li>
+                                <li><strong>컬럼명:</strong> 교환권번호, 고객명</li>
                                 <li><strong>특징:</strong> "매출_" 접두어 자동 제거, 불필요한 컬럼 자동 제거</li>
                             </ul>
                             {% else %}

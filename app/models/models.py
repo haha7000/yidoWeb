@@ -332,53 +332,43 @@ class PassportArchive(Base):
 
     user = relationship("User")
 
-
-# class LotteExcelData(Base):
-#     """롯데 면세점 엑셀 데이터"""
-#     __tablename__ = "lotte_excel_data"
+class LotteExcelData(Base):
+    """롯데 면세점 엑셀 데이터"""
+    __tablename__ = "lotte_excel_data"
     
-#     id = Column(Integer, primary_key=True, autoincrement=True)
+    # Primary Key (SERIAL)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     
-#     # 기본 정보
-#     VIP번호 = Column(Float, nullable=True)  # double precision
-#     매출일자 = Column(TIMESTAMP, nullable=True)  # timestamp without time zone
-#     단체번호 = Column(Float, nullable=True)  # double precision
-#     판매수량 = Column(Integer, nullable=True)  # bigint -> Integer로 매핑
+    # 실제 DB 스키마에 맞는 컬럼들 (text 타입)
+    점구분 = Column(Text, nullable=True)
+    원매출일자 = Column(Text, nullable=True)
+    매출일자 = Column(Text, nullable=True)
+    수입_로컬 = Column(Text, nullable=True, name='수입/로컬')
+    단체번호 = Column(Text, nullable=True)
+    name = Column(Text, nullable=True)
+    VIP번호 = Column(Text, nullable=True)
+    receiptNumber = Column(Text, nullable=True)
+    교환권상태 = Column(Text, nullable=True)
+    카테고리 = Column(Text, nullable=True)
+    브랜드 = Column(Text, nullable=True)
+    상품명 = Column(Text, nullable=True)
+    상품구분 = Column(Text, nullable=True)
+    상품코드 = Column(Text, nullable=True)
+    Ref_No = Column(Text, nullable=True, name='Ref.No')
+    Color = Column(Text, nullable=True)
+    배송구분 = Column(Text, nullable=True)
+    판매방식 = Column(Text, nullable=True)
     
-#     # 금액 정보 (달러)
-#     판매가_달러 = Column(Float, nullable=True, name='판매가($)')  # double precision
-#     총매출액_달러 = Column(Integer, nullable=True, name='총매출액($)')  # bigint
-#     순매출액_달러 = Column(Integer, nullable=True, name='순매출액($)')  # bigint  
-#     할인액_달러 = Column(Integer, nullable=True, name='할인액($)')  # bigint
+    # 실제 DB 스키마에 맞는 컬럼들 (numeric 타입)
+    판매수량 = Column(DECIMAL(15,2), nullable=True)
+    판매가_달러 = Column(DECIMAL(15,2), nullable=True, name='판매가($)')
+    총매출액_달러 = Column(DECIMAL(15,2), nullable=True, name='총매출액($)')
+    순매출액_달러 = Column(DECIMAL(15,2), nullable=True, name='순매출액($)')
+    할인액_달러 = Column(DECIMAL(15,2), nullable=True, name='할인액($)')
+    총매출액_원 = Column(DECIMAL(15,2), nullable=True, name='총매출액(\)')
+    순매출액_원 = Column(DECIMAL(15,2), nullable=True, name='순매출액(\)')
+    할인액_원 = Column(DECIMAL(15,2), nullable=True, name='할인액(\)')
     
-#     # 금액 정보 (원화)
-#     총매출액_원 = Column(Integer, nullable=True, name='총매출액(\)')  # bigint
-#     순매출액_원 = Column(Integer, nullable=True, name='순매출액(\)')  # bigint
-#     할인액_원 = Column(Integer, nullable=True, name='할인액(\)')  # bigint
-#     PayBack = Column(Integer, nullable=True)  # bigint
-    
-#     # 상품 정보
-#     상품코드 = Column(Float, nullable=True)  # double precision
-#     원매출일자 = Column(TIMESTAMP, nullable=True)  # timestamp without time zone
-#     Ref_No = Column(Text, nullable=True, name='Ref.No')  # text
-    
-#     # 고객 및 영수증 정보
-#     name = Column(Text, nullable=True)  # text
-#     receiptNumber = Column(Text, nullable=True)  # text
-#     교환권상태 = Column(Text, nullable=True)  # text
-    
-#     # 상품 분류 정보
-#     카테고리 = Column(Text, nullable=True)  # text
-#     브랜드 = Column(Text, nullable=True)  # text
-#     상품명 = Column(Text, nullable=True)  # text
-#     상품구분 = Column(Text, nullable=True)  # text
-#     점구분 = Column(Text, nullable=True)  # text
-#     Color = Column(Text, nullable=True)  # text
-#     배송구분 = Column(Text, nullable=True)  # text
-#     판매방식 = Column(Text, nullable=True)  # text
-    
-#     def __repr__(self):
-#         return f"<LotteExcelData(name={self.name}, receiptNumber={self.receiptNumber}, 상품명={self.상품명})>"
-
-
+    def __repr__(self):
+        return f"<LotteExcelData(name={self.name}, receiptNumber={self.receiptNumber}, 상품명={self.상품명})>"
 

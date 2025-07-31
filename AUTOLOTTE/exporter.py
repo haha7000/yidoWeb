@@ -78,31 +78,25 @@ class LotteExporter:
                 'brndNm': '브랜드',
                 'prodNm': '상품명',
                 'prdcd': '상품코드',
-                'custNm': '고객명',
+                'custNm': 'name',
                 'slQty': '판매수량',
-                'wonTotSalamt': '총매출액(원)',
-                'wonNsalamt': '순매출액(원)',
-                
-                # 새로 추가된 매핑
+                'wonTotSalamt': '총매출액(\)',
+                'wonNsalamt': '순매출액(\)',
                 'entshpTaycd': '여행사코드',
                 'brndcd': '브랜드코드',
                 'cateNm': '카테고리',
-                'exchNo': '교환권번호',
+                'exchNo': 'receiptNumber',
                 'gdeNm': '가이드',
                 'gdecd': '가이드코드',
                 'grpNo': '단체번호',
                 'grpTypeNm': '단체유형',
                 'imptLocalDvsCd': '수입/로컬',
                 'psptno': '여권번호',
-                'dlrTotSalamt': '총매출액(달러)',
-                'dlrNsalamt': '순매출액(달러)',
-                'dlrTotDcAmt': '할인액(달러)',
+                'dlrTotSalamt': '총매출액($)',
+                'dlrNsalamt': '순매출액($)',
+                'dlrTotDcAmt': '할인액($)',
                 'dlvrDvsCd': '배송구분코드',
-                
-                # 한글 컬럼 변경
                 '지점명': '점구분',
-                
-                # 추가로 나올 수 있는 컬럼들
                 'rcrtcustRgnCd': '고객지역코드',
                 'typeCd': '유형코드',
                 'imptLocalDvsNm': '수입/로컬구분',

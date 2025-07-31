@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.lotte.scheduler</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/ec2-user/yido/yidoweb/dbtest/venv/bin/python</string>
+        <string>/Users/ec2-user/yido/yidoweb/dbtest/AUTOLOTTE/scheduler.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/ec2-user/yido/yidoweb/dbtest/AUTOLOTTE</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/ec2-user/yido/yidoweb/dbtest/AUTOLOTTE/logs/scheduler.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/ec2-user/yido/yidoweb/dbtest/AUTOLOTTE/logs/scheduler_error.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONPATH</key>
+        <string>/Users/ec2-user/yido/yidoweb/dbtest</string>
+        <key>LOTTE_DB_URL</key>
+        <string>postgresql://test_user:0000@localhost:5432/my_test_db</string>
+        <key>LOTTE_USER_ID</key>
+        <string>T301912</string>
+        <key>LOTTE_PASSWORD</key>
+        <string>huixin210@</string>
+    </dict>
+</dict>
+</plist>
