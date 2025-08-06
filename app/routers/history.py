@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, HTTPException, Form, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import JSONResponse, RedirectResponse
 from app.core.database import SessionLocal
-from app.models.models import User, Receipt, Passport, ReceiptMatchLog, ShillaReceipt, ProcessingHistory, PassportArchive
+from app.models.models import User, Receipt, Passport, ReceiptMatchLog, ShillaReceipt, ProcessingHistory, PassportArchive, UnrecognizedImage
 from datetime import datetime
 from sqlalchemy.sql import text
 from sqlalchemy.orm import Session
@@ -149,12 +149,10 @@ async def complete_session(
         receipt_deleted = db.query(Receipt).filter(Receipt.user_id == current_user.id).delete()
         shilla_deleted = db.query(ShillaReceipt).filter(ShillaReceipt.user_id == current_user.id).delete()
         passport_deleted = db.query(Passport).filter(Passport.user_id == current_user.id).delete()
+        unrecognized_deleted = db.query(UnrecognizedImage).filter(UnrecognizedImage.user_id == current_user.id).delete()
         
-        print(f"기타 테이블 삭제: receipts={receipt_deleted}, shilla_receipts={shilla_deleted}, passports={passport_deleted}")
+        print(f"기타 테이블 삭제: receipts={receipt_deleted}, shilla_receipts={shilla_deleted}, passports={passport_deleted}, unrecognized_images={unrecognized_deleted}")
         print(f"아카이브된 여권: {archived_passport_count}개")
-        
-        # 엑셀 데이터 테이블은 보존 (다른 사용자도 사용할 수 있으므로)
-        # 엑셀 데이터는 업로드 시마다 새로 생성되므로 삭제하지 않음
         print("엑셀 데이터 테이블은 보존됨 (다른 사용자와 공유 가능)")
         
         # 모든 변경사항 커밋

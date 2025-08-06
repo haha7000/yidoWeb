@@ -68,8 +68,8 @@ def LotteAiOcr(imagePath, user_id):
         # OCR 및 GPT 처리
         # response = requests.post("http://host.docker.internal:9000/ocr", files={"file": open(imagePath, "rb")})
         # ocrResult = response.json()
-        ocrResult = ocrResult['text']
-        # ocrResult = VisionOcr(imagePath)
+        # ocrResult = ocrResult['text']
+        ocrResult = VisionOcr(imagePath)
         result = LotteClassificationUseGpt(ocrResult)
 
         # JSON 문자열을 파싱

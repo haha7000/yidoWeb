@@ -31,6 +31,7 @@ async def get_uploaded_fees(current_user: User = Depends(get_current_user)):
                 branch_name,
                 effective_from,
                 effective_to,
+                free_rate_threshold,
                 created_at,
                 creator_id,
                 note
@@ -49,6 +50,7 @@ async def get_uploaded_fees(current_user: User = Depends(get_current_user)):
                     "branch_name": row.branch_name,
                     "effective_from": row.effective_from.strftime("%Y-%m-%d") if row.effective_from else None,
                     "effective_to": row.effective_to.strftime("%Y-%m-%d") if row.effective_to else None,
+                    "free_rate_threshold": float(row.free_rate_threshold * 100) if row.free_rate_threshold else 0.0,  # 백분율로 변환
                     "created_at": row.created_at.strftime("%Y-%m-%d %H:%M:%S") if row.created_at else None,
                     "note": row.note
                 })
@@ -130,6 +132,147 @@ async def delete_uploaded_fees(
         return JSONResponse({
             "success": False,
             "message": f"수수료 설정 삭제 중 오류가 발생했습니다: {str(e)}"
+        }, status_code=500)
+
+@router.get("/api/fees/settings/{settings_id}")
+async def get_fee_setting_detail(
+    settings_id: int,
+    current_user: User = Depends(get_current_user)
+):
+    """특정 수수료 설정의 상세 정보 조회"""
+    try:
+        with SessionLocal() as db:
+            # 1. 권한 확인 및 기본 설정 조회
+            settings_query = """
+            SELECT 
+                id,
+                company_name,
+                branch_name,
+                effective_from,
+                effective_to,
+                free_rate_threshold,
+                created_at,
+                creator_id,
+                note
+            FROM fee_settings 
+            WHERE id = :settings_id AND creator_id = :user_id
+            """
+            
+            settings_result = db.execute(text(settings_query), {
+                "settings_id": settings_id,
+                "user_id": current_user.id
+            }).first()
+            
+            if not settings_result:
+                return JSONResponse({
+                    "success": False,
+                    "message": "권한이 없거나 존재하지 않는 수수료 설정입니다."
+                }, status_code=403)
+            
+            # 2. 카테고리별 수수료 조회
+            category_query = """
+            SELECT id, fee_type, commission_rate, created_at
+            FROM category_fees 
+            WHERE settings_id = :settings_id
+            ORDER BY 
+                CASE fee_type 
+                    WHEN '일반' THEN 1
+                    WHEN '토산 화장품' THEN 2  
+                    WHEN '수입 화장품' THEN 3
+                    WHEN '주류' THEN 4
+                    WHEN '담배' THEN 5
+                    WHEN '식품' THEN 6
+                    WHEN '전자기기' THEN 7
+                    ELSE 8
+                END
+            """
+            category_results = db.execute(text(category_query), {"settings_id": settings_id}).fetchall()
+            
+            # 3. 브랜드별 수수료 조회
+            brand_query = """
+            SELECT id, category_code, category_name, import_type, brand_name, commission_rate, created_at
+            FROM brand_fees 
+            WHERE settings_id = :settings_id
+            ORDER BY category_code, brand_name
+            """
+            brand_results = db.execute(text(brand_query), {"settings_id": settings_id}).fetchall()
+            
+            # 4. 품목별 수수료 조회
+            item_query = """
+            SELECT id, category_code, category_name, import_type, brand_name, item_name, product_code, commission_rate, created_at
+            FROM item_fees 
+            WHERE settings_id = :settings_id
+            ORDER BY category_code, brand_name, product_code
+            """
+            item_results = db.execute(text(item_query), {"settings_id": settings_id}).fetchall()
+            
+            # 5. 수수료 제외 브랜드 조회
+            exempt_query = """
+            SELECT id, category_code, category_name, import_type, brand_name, created_at
+            FROM exempt_brands 
+            WHERE settings_id = :settings_id
+            ORDER BY category_code, brand_name
+            """
+            exempt_results = db.execute(text(exempt_query), {"settings_id": settings_id}).fetchall()
+            
+            # 6. 응답 데이터 구성
+            response_data = {
+                "settings": {
+                    "id": settings_result.id,
+                    "company_name": settings_result.company_name,
+                    "branch_name": settings_result.branch_name,
+                    "effective_from": settings_result.effective_from.strftime("%Y-%m-%d") if settings_result.effective_from else None,
+                    "effective_to": settings_result.effective_to.strftime("%Y-%m-%d") if settings_result.effective_to else None,
+                    "free_rate_threshold": float(settings_result.free_rate_threshold) if settings_result.free_rate_threshold else 0.0,
+                    "created_at": settings_result.created_at.strftime("%Y-%m-%d %H:%M:%S") if settings_result.created_at else None,
+                    "note": settings_result.note
+                },
+                "category_fees": [{
+                    "id": row.id,
+                    "fee_type": row.fee_type,
+                    "commission_rate": float(row.commission_rate),
+                    "created_at": row.created_at.strftime("%Y-%m-%d %H:%M:%S") if row.created_at else None
+                } for row in category_results],
+                "brand_fees": [{
+                    "id": row.id,
+                    "category_code": row.category_code,
+                    "category_name": row.category_name,
+                    "import_type": row.import_type,
+                    "brand_name": row.brand_name,
+                    "commission_rate": float(row.commission_rate),
+                    "created_at": row.created_at.strftime("%Y-%m-%d %H:%M:%S") if row.created_at else None
+                } for row in brand_results],
+                "item_fees": [{
+                    "id": row.id,
+                    "category_code": row.category_code,
+                    "category_name": row.category_name,
+                    "import_type": row.import_type,
+                    "brand_name": row.brand_name,
+                    "item_name": row.item_name,
+                    "product_code": row.product_code,
+                    "commission_rate": float(row.commission_rate),
+                    "created_at": row.created_at.strftime("%Y-%m-%d %H:%M:%S") if row.created_at else None
+                } for row in item_results],
+                "exempt_brands": [{
+                    "id": row.id,
+                    "category_code": row.category_code,
+                    "category_name": row.category_name,
+                    "import_type": row.import_type,
+                    "brand_name": row.brand_name,
+                    "created_at": row.created_at.strftime("%Y-%m-%d %H:%M:%S") if row.created_at else None
+                } for row in exempt_results]
+            }
+            
+            return JSONResponse({
+                "success": True,
+                "data": response_data,
+                **response_data  # 호환성을 위해 최상위에도 포함
+            })
+            
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "message": f"수수료 설정 조회 중 오류가 발생했습니다: {str(e)}"
         }, status_code=500)
 
 @router.put("/api/fees/settings/{settings_id}")
