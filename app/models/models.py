@@ -31,6 +31,11 @@ class User(Base):
     approved_at = Column(TIMESTAMP, nullable=True)  # 승인일시
     approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # 승인자
     last_login = Column(TIMESTAMP, nullable=True)  # 최근 로그인
+    
+    # 비밀번호 재설정 및 임시 비밀번호 관련
+    reset_token = Column(String(255), nullable=True)  # 비밀번호 재설정 토큰
+    reset_token_expires = Column(TIMESTAMP, nullable=True)  # 토큰 만료 시간
+    is_temp_password = Column(Boolean, default=False)  # 임시 비밀번호 여부
 
     # 관계 설정
     receipts = relationship("Receipt", back_populates="user")
@@ -48,6 +53,41 @@ class User(Base):
     @classmethod
     def hash_password(cls, password: str) -> str:
         return pwd_context.hash(password)
+    
+    def generate_reset_token(self) -> str:
+        """비밀번호 재설정 토큰 생성"""
+        import secrets
+        import string
+        from datetime import datetime, timedelta
+        
+        # 32자리 랜덤 토큰 생성
+        token = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
+        
+        # 토큰과 만료시간 설정 (1시간)
+        self.reset_token = token
+        self.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+        
+        return token
+    
+    def is_reset_token_valid(self, token: str) -> bool:
+        """재설정 토큰 유효성 검사"""
+        from datetime import datetime
+        
+        if not self.reset_token or not self.reset_token_expires:
+            return False
+            
+        if self.reset_token != token:
+            return False
+            
+        if datetime.utcnow() > self.reset_token_expires:
+            return False
+            
+        return True
+    
+    def clear_reset_token(self):
+        """재설정 토큰 삭제"""
+        self.reset_token = None
+        self.reset_token_expires = None
     
     @staticmethod
     def normalize_company_name(company_name: str) -> str:

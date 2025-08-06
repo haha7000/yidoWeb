@@ -229,8 +229,12 @@ async def login_user(
             expires_delta=access_token_expires
         )
         
-        # 쿠키에 토큰 저장하고 업로드 페이지로 리다이렉트
-        response = RedirectResponse(url="/upload/", status_code=302)
+        # 임시 비밀번호 사용자는 비밀번호 변경 페이지로 리다이렉트
+        if user.is_temp_password:
+            response = RedirectResponse(url="/auth/change-password", status_code=302)
+        else:
+            response = RedirectResponse(url="/upload/", status_code=302)
+            
         response.set_cookie(
             key="access_token",
             value=access_token,

@@ -218,6 +218,27 @@
             text-decoration: underline;
         }
 
+        /* 아이디/비밀번호 찾기 링크 스타일 */
+        .find-link {
+            color: var(--medium-gray);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 400;
+            transition: all 0.3s ease;
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+
+        .find-link:hover {
+            color: var(--accent-color);
+            background-color: rgba(74, 144, 226, 0.1);
+            text-decoration: none;
+        }
+
+        .find-links {
+            border-top: 1px solid #e9ecef !important;
+        }
+
         .alert {
             border-radius: 12px;
             border: none;
@@ -329,6 +350,19 @@
                     </span>
                 </button>
             </form>
+            
+            <!-- 아이디/비밀번호 찾기 링크 -->
+            <div class="find-links" style="text-align: center; margin: 20px 0; padding: 15px 0; border-top: 1px solid #e9ecef;">
+                <div class="d-flex justify-content-center gap-3">
+                    <a href="/auth/find-username" class="find-link">
+                        <i class="fas fa-search me-1"></i>아이디 찾기
+                    </a>
+                    <span class="text-muted">|</span>
+                    <a href="/auth/find-password" class="find-link">
+                        <i class="fas fa-key me-1"></i>비밀번호 찾기
+                    </a>
+                </div>
+            </div>
             
             <div class="register-link">
                 <a href="/register">

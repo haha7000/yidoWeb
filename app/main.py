@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.database import my_engine
 from app.models.models import Base
-from app.routers import auth, api, upload
+from app.routers import auth, api, upload, password_recovery
 from app.routers import receipt, passport, history, fee, admin, result_management
 
 # FastAPI 앱 생성
@@ -25,6 +25,7 @@ async def startup_event():
 app.mount("/static", StaticFiles(directory=settings.static_dir), name="static")
 app.mount("/uploads", StaticFiles(directory=settings.uploads_dir, html=True), name="uploads")
 app.include_router(auth.router, tags=["인증"])
+app.include_router(password_recovery.router, tags=["비밀번호복구"])
 app.include_router(api.router, tags=["API"])
 app.include_router(upload.router, tags=["업로드"])
 app.include_router(receipt.router, tags=["영수증"])

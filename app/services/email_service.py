@@ -449,6 +449,299 @@ class EmailService:
         """
         
         return self.send_email(user_email, subject, html_body)
+    
+    def send_username_recovery_email(self, user_email: str, username: str, company_name: str) -> bool:
+        """아이디 찾기 결과 이메일"""
+        subject = "[YIDOWEB] 아이디 찾기 결과"
+        
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {{
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    line-height: 1.6;
+                    margin: 0;
+                    padding: 20px;
+                    background-color: #f5f5f5;
+                }}
+                .container {{
+                    max-width: 600px;
+                    margin: 0 auto;
+                    background-color: white;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    overflow: hidden;
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+                    color: white;
+                    padding: 30px;
+                    text-align: center;
+                }}
+                .content {{
+                    padding: 40px 30px;
+                }}
+                .username-box {{
+                    background-color: #f8fafc;
+                    border: 2px solid #e2e8f0;
+                    border-radius: 8px;
+                    padding: 20px;
+                    margin: 20px 0;
+                    text-align: center;
+                }}
+                .username {{
+                    font-family: 'Courier New', monospace;
+                    font-size: 24px;
+                    font-weight: bold;
+                    color: #1e40af;
+                    letter-spacing: 1px;
+                }}
+                .info-table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 20px 0;
+                }}
+                .info-table td {{
+                    padding: 10px;
+                    border-bottom: 1px solid #e2e8f0;
+                }}
+                .info-table td:first-child {{
+                    font-weight: bold;
+                    color: #374151;
+                    width: 30%;
+                }}
+                .button {{
+                    display: inline-block;
+                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                    color: white;
+                    padding: 15px 30px;
+                    text-decoration: none;
+                    border-radius: 8px;
+                    font-weight: bold;
+                    margin: 20px 0;
+                }}
+                .footer {{
+                    background-color: #f8fafc;
+                    padding: 20px;
+                    text-align: center;
+                    color: #6b7280;
+                    font-size: 14px;
+                }}
+                .warning {{
+                    background-color: #fef3c7;
+                    border-left: 4px solid #f59e0b;
+                    padding: 15px;
+                    margin: 20px 0;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🔍 아이디 찾기 결과</h1>
+                    <p>요청하신 아이디 정보를 안내드립니다.</p>
+                </div>
+                
+                <div class="content">
+                    <p>안녕하세요, <strong>{company_name}</strong> 소속 회원님!</p>
+                    <p>해당 이메일로 등록된 아이디 정보입니다.</p>
+                    
+                    <table class="info-table">
+                        <tr>
+                            <td>회사명</td>
+                            <td>{company_name}</td>
+                        </tr>
+                        <tr>
+                            <td>이메일</td>
+                            <td>{user_email}</td>
+                        </tr>
+                        <tr>
+                            <td>조회일시</td>
+                            <td>{datetime.now().strftime('%Y년 %m월 %d일 %H:%M')}</td>
+                        </tr>
+                    </table>
+                    
+                    <div class="username-box">
+                        <p style="margin-bottom: 10px;"><strong>찾으신 아이디</strong></p>
+                        <div class="username">{username}</div>
+                    </div>
+                    
+                    <div class="warning">
+                        <strong>🔒 보안 안내</strong><br>
+                        • 본인이 요청한 것이 아니라면 즉시 관리자에게 연락해 주세요.<br>
+                        • 아이디와 비밀번호는 안전한 곳에 보관해 주세요.<br>
+                        • 정기적으로 비밀번호를 변경하시기 바랍니다.
+                    </div>
+                    
+                    <div style="text-align: center;">
+                        <a href="http://localhost:8002/login/" class="button">
+                            🔓 로그인하러 가기
+                        </a>
+                    </div>
+                    
+                    <p style="margin-top: 40px;">
+                        비밀번호를 잊으셨다면 로그인 페이지에서 "비밀번호 찾기"를 이용해 주세요.<br>
+                        감사합니다.
+                    </p>
+                </div>
+                
+                <div class="footer">
+                    <p>본 메일은 발신 전용입니다. 문의사항은 관리자에게 연락해 주세요.</p>
+                    <p>© 2025 YIDOWEB. All rights reserved.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        return self.send_email(user_email, subject, html_body)
+    
+    def send_password_reset_email(self, user_email: str, username: str, company_name: str, reset_token: str) -> bool:
+        """비밀번호 재설정 링크 이메일"""
+        subject = "[YIDOWEB] 비밀번호 재설정 요청"
+        
+        reset_url = f"http://localhost:8002/auth/reset-password?token={reset_token}"
+        
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {{
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    line-height: 1.6;
+                    margin: 0;
+                    padding: 20px;
+                    background-color: #f5f5f5;
+                }}
+                .container {{
+                    max-width: 600px;
+                    margin: 0 auto;
+                    background-color: white;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    overflow: hidden;
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                    color: white;
+                    padding: 30px;
+                    text-align: center;
+                }}
+                .content {{
+                    padding: 40px 30px;
+                }}
+                .info-table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 20px 0;
+                }}
+                .info-table td {{
+                    padding: 10px;
+                    border-bottom: 1px solid #e2e8f0;
+                }}
+                .info-table td:first-child {{
+                    font-weight: bold;
+                    color: #374151;
+                    width: 30%;
+                }}
+                .button {{
+                    display: inline-block;
+                    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                    color: white;
+                    padding: 15px 30px;
+                    text-decoration: none;
+                    border-radius: 8px;
+                    font-weight: bold;
+                    margin: 20px 0;
+                    font-size: 16px;
+                }}
+                .footer {{
+                    background-color: #f8fafc;
+                    padding: 20px;
+                    text-align: center;
+                    color: #6b7280;
+                    font-size: 14px;
+                }}
+                .warning {{
+                    background-color: #fef2f2;
+                    border-left: 4px solid #ef4444;
+                    padding: 15px;
+                    margin: 20px 0;
+                }}
+                .info-box {{
+                    background-color: #eff6ff;
+                    border-left: 4px solid #3b82f6;
+                    padding: 15px;
+                    margin: 20px 0;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🔑 비밀번호 재설정</h1>
+                    <p>비밀번호 재설정 요청을 받았습니다.</p>
+                </div>
+                
+                <div class="content">
+                    <p>안녕하세요, <strong>{company_name}</strong>의 <strong>{username}</strong>님!</p>
+                    <p>귀하의 계정에 대한 비밀번호 재설정 요청이 접수되었습니다.</p>
+                    
+                    <table class="info-table">
+                        <tr>
+                            <td>아이디</td>
+                            <td><strong>{username}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>이메일</td>
+                            <td>{user_email}</td>
+                        </tr>
+                        <tr>
+                            <td>요청일시</td>
+                            <td>{datetime.now().strftime('%Y년 %m월 %d일 %H:%M')}</td>
+                        </tr>
+                    </table>
+                    
+                    <div class="info-box">
+                        <strong>📋 재설정 방법</strong><br>
+                        아래 버튼을 클릭하여 새로운 비밀번호를 설정해 주세요.<br>
+                        링크는 <strong>1시간 동안</strong>만 유효합니다.
+                    </div>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="{reset_url}" class="button">
+                            🔑 비밀번호 재설정하기
+                        </a>
+                    </div>
+                    
+                    <div class="warning">
+                        <strong>⚠️ 보안 경고</strong><br>
+                        • 본인이 요청한 것이 아니라면 이 이메일을 무시하고 관리자에게 연락해 주세요.<br>
+                        • 링크를 클릭하기 전에 URL이 올바른지 확인해 주세요.<br>
+                        • 비밀번호 재설정 후에는 이 링크는 더 이상 사용할 수 없습니다.
+                    </div>
+                    
+                    <p style="margin-top: 40px; font-size: 14px; color: #6b7280;">
+                        링크가 작동하지 않는다면 아래 URL을 복사해서 브라우저에 직접 입력하세요:<br>
+                        <code>{reset_url}</code>
+                    </p>
+                </div>
+                
+                <div class="footer">
+                    <p>본 메일은 발신 전용입니다. 문의사항은 관리자에게 연락해 주세요.</p>
+                    <p>© 2025 YIDOWEB. All rights reserved.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        return self.send_email(user_email, subject, html_body)
 
 # 전역 인스턴스
 email_service = EmailService()

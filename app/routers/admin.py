@@ -170,6 +170,7 @@ async def approve_user(
         user.hashed_password = hashed_password
         user.approved_at = func.now()
         user.approved_by = current_admin.id
+        user.is_temp_password = True  # 임시 비밀번호 플래그 설정
         
         db.commit()
         
