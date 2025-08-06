@@ -9,9 +9,12 @@ from app.core.database import SessionLocal
 from app.models.models import User
 
 # JWT 설정
-SECRET_KEY = "your-secret-key-here"  # 실제로는 환경변수로 관리
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+
+def get_secret_key():
+    from app.core.config import settings
+    return settings.secret_key
 
 security = HTTPBearer()
 
@@ -29,12 +32,12 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, get_secret_key(), algorithm=ALGORITHM)
     return encoded_jwt
 
 def verify_token(token: str):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, get_secret_key(), algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             return None  # 예외 대신 None 반환

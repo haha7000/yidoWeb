@@ -19,9 +19,18 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String(50), unique=True, nullable=False)
     email = Column(String(100), unique=True, nullable=False)
-    hashed_password = Column(String(100), nullable=False)
+    hashed_password = Column(String(100), nullable=True)  # 승인 전까지는 null 허용
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    # 새로 추가된 필드들
+    company_name = Column(String(100), nullable=False)  # 회사명
+    position = Column(String(50), nullable=False)  # 직책
+    is_admin = Column(Boolean, default=False)  # 관리자 여부
+    status = Column(String(20), default="pending")  # pending, approved, rejected
+    approved_at = Column(TIMESTAMP, nullable=True)  # 승인일시
+    approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # 승인자
+    last_login = Column(TIMESTAMP, nullable=True)  # 최근 로그인
 
     # 관계 설정
     receipts = relationship("Receipt", back_populates="user")
@@ -30,12 +39,41 @@ class User(Base):
     archives = relationship("ProcessingArchive", back_populates="user")
     processing_histories = relationship("ProcessingHistory", back_populates="user")
     
+    # 승인자 관계 (자기 참조)
+    approver = relationship("User", remote_side=[id], backref="approved_users")
+    
     def verify_password(self, password: str) -> bool:
         return pwd_context.verify(password, self.hashed_password)
     
     @classmethod
     def hash_password(cls, password: str) -> str:
         return pwd_context.hash(password)
+    
+    @staticmethod
+    def normalize_company_name(company_name: str) -> str:
+        """회사명을 정규화하여 중복 체크에 사용"""
+        if not company_name:
+            return ""
+        # 공백 제거, 소문자 변환, 특수문자 정리
+        normalized = company_name.strip().lower()
+        normalized = normalized.replace(" ", "").replace("　", "")  # 일반 공백과 전각 공백 제거
+        normalized = normalized.replace("(주)", "").replace("주식회사", "").replace("㈜", "")
+        normalized = normalized.replace("株式会社", "").replace("co.,ltd", "").replace("corp", "")
+        return normalized
+    
+    @classmethod
+    def is_company_name_taken(cls, company_name: str, db_session) -> bool:
+        """회사명 중복 체크"""
+        normalized = cls.normalize_company_name(company_name)
+        if not normalized:
+            return False
+        
+        # 모든 사용자의 회사명을 정규화하여 비교
+        users = db_session.query(cls).filter(cls.company_name.isnot(None)).all()
+        for user in users:
+            if cls.normalize_company_name(user.company_name) == normalized:
+                return True
+        return False
 
 # 신라 영수증 모델 
 class ShillaReceipt(Base):

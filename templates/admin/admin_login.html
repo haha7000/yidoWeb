@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YIDOWEB 관리자 로그인</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --admin-primary: #dc3545;
+            --admin-secondary: #6c757d;
+            --admin-accent: #fd7e14;
+            --admin-dark: #212529;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body { 
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            pointer-events: none;
+        }
+
+        .admin-container {
+            width: 100%;
+            max-width: 400px;
+            margin: 0 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .admin-form {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 50px 40px;
+            box-shadow: 
+                0 25px 50px rgba(0, 0, 0, 0.15),
+                0 12px 24px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            border: 2px solid rgba(220, 53, 69, 0.1);
+            animation: slideInUp 0.6s ease-out;
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .admin-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .admin-logo {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--admin-primary), var(--admin-accent));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 24px;
+            color: white;
+            box-shadow: 0 8px 16px rgba(220, 53, 69, 0.3);
+            animation: logoFloat 3s ease-in-out infinite;
+        }
+
+        @keyframes logoFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-3px); }
+        }
+
+        .admin-header h2 {
+            color: var(--admin-dark);
+            font-weight: 700;
+            font-size: 26px;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .admin-header p {
+            color: var(--admin-secondary);
+            font-weight: 400;
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .form-group {
+            position: relative;
+            margin-bottom: 25px;
+        }
+
+        .form-label {
+            color: var(--admin-dark);
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+            letter-spacing: 0.3px;
+        }
+
+        .input-group {
+            position: relative;
+        }
+
+        .input-group .form-control {
+            padding: 16px 20px 16px 50px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .input-group .form-control:focus {
+            border-color: var(--admin-primary);
+            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+            background: rgba(255, 255, 255, 1);
+            transform: translateY(-1px);
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--admin-secondary);
+            font-size: 16px;
+            z-index: 10;
+            transition: color 0.3s ease;
+        }
+
+        .form-control:focus + .input-icon {
+            color: var(--admin-primary);
+        }
+
+        .btn-admin-login {
+            background: linear-gradient(135deg, var(--admin-primary) 0%, var(--admin-accent) 100%);
+            border: none;
+            padding: 18px 20px;
+            font-weight: 600;
+            font-size: 16px;
+            border-radius: 12px;
+            width: 100%;
+            color: white;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-admin-login::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .btn-admin-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(220, 53, 69, 0.4);
+        }
+
+        .btn-admin-login:hover::before {
+            left: 100%;
+        }
+
+        .btn-admin-login:active {
+            transform: translateY(0);
+        }
+
+        .alert {
+            border-radius: 12px;
+            border: none;
+            margin-bottom: 25px;
+            animation: alertSlide 0.3s ease-out;
+        }
+
+        @keyframes alertSlide {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .alert-danger {
+            background: linear-gradient(135deg, #ff6b6b, #ff5252);
+            color: white;
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg, #51cf66, #40c057);
+            color: white;
+            box-shadow: 0 4px 12px rgba(81, 207, 102, 0.3);
+        }
+
+        .admin-footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .admin-footer a {
+            color: var(--admin-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.3s ease;
+        }
+
+        .admin-footer a:hover {
+            color: var(--admin-primary);
+        }
+
+        @media (max-width: 768px) {
+            .admin-form {
+                margin: 20px;
+                padding: 40px 30px;
+            }
+            
+            .admin-header h2 {
+                font-size: 22px;
+            }
+            
+            .admin-logo {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+        }
+
+        /* 보안 아이콘 */
+        .security-badge {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 30px;
+            height: 30px;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: white;
+            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* 로딩 애니메이션 */
+        .btn-admin-login.loading {
+            pointer-events: none;
+        }
+
+        .btn-admin-login.loading::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            margin: auto;
+            border: 2px solid transparent;
+            border-top-color: #ffffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="admin-form">
+            <div class="security-badge">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            
+            <div class="admin-header">
+                <div class="admin-logo">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <h2>관리자 로그인</h2>
+                <p>시스템 관리를 위한 인증이 필요합니다</p>
+            </div>
+            
+            {% if error %}
+            <div class="alert alert-danger" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>{{ error }}
+            </div>
+            {% endif %}
+            
+            {% if success %}
+            <div class="alert alert-success" role="alert">
+                <i class="fas fa-check-circle me-2"></i>{{ success }}
+            </div>
+            {% endif %}
+            
+            <form method="POST" action="/admin/login/" id="adminLoginForm">
+                <div class="form-group">
+                    <label for="username" class="form-label">
+                        <i class="fas fa-user-tie me-2"></i>관리자 아이디
+                    </label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="username" name="username" 
+                               placeholder="관리자 아이디를 입력하세요" required autocomplete="username">
+                        <i class="fas fa-user-tie input-icon"></i>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password" class="form-label">
+                        <i class="fas fa-key me-2"></i>비밀번호
+                    </label>
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="password" name="password" 
+                               placeholder="비밀번호를 입력하세요" required autocomplete="current-password">
+                        <i class="fas fa-key input-icon"></i>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn-admin-login" id="loginBtn">
+                    <span class="btn-text">
+                        <i class="fas fa-sign-in-alt me-2"></i>관리자 로그인
+                    </span>
+                </button>
+            </form>
+            
+            <div class="admin-footer">
+                <a href="/login">
+                    <i class="fas fa-arrow-left me-1"></i>일반 사용자 로그인으로 돌아가기
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 관리자 로그인 폼 제출 시 로딩 애니메이션
+        document.getElementById('adminLoginForm').addEventListener('submit', function(e) {
+            const loginBtn = document.getElementById('loginBtn');
+            const btnText = loginBtn.querySelector('.btn-text');
+            
+            loginBtn.classList.add('loading');
+            btnText.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>인증 중...';
+            loginBtn.disabled = true;
+            
+            // 10초 후에도 응답이 없으면 원래 상태로 복구
+            setTimeout(() => {
+                if (loginBtn.classList.contains('loading')) {
+                    loginBtn.classList.remove('loading');
+                    btnText.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>관리자 로그인';
+                    loginBtn.disabled = false;
+                }
+            }, 10000);
+        });
+
+        // 입력 필드 보안 강화 효과
+        const inputs = document.querySelectorAll('.form-control');
+        inputs.forEach(input => {
+            input.addEventListener('focus', function() {
+                this.parentElement.style.transform = 'scale(1.02)';
+                this.parentElement.style.filter = 'drop-shadow(0 0 8px rgba(220, 53, 69, 0.2))';
+            });
+            
+            input.addEventListener('blur', function() {
+                this.parentElement.style.transform = 'scale(1)';
+                this.parentElement.style.filter = 'none';
+            });
+        });
+
+        // 키보드 단축키 (Enter)
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                const activeElement = document.activeElement;
+                if (activeElement.tagName === 'INPUT') {
+                    e.preventDefault();
+                    document.getElementById('adminLoginForm').submit();
+                }
+            }
+        });
+
+        // 보안 경고 (개발자 도구 감지)
+        let devtools = {
+            open: false,
+            orientation: null
+        };
+        
+        setInterval(function() {
+            if (window.outerHeight - window.innerHeight > 160 || window.outerWidth - window.innerWidth > 160) {
+                if (!devtools.open) {
+                    devtools.open = true;
+                    console.warn('⚠️ 관리자 시스템 보안 경고: 개발자 도구가 감지되었습니다.');
+                }
+            } else {
+                devtools.open = false;
+            }
+        }, 500);
+    </script>
+</body>
+</html>

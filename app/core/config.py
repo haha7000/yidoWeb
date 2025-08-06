@@ -12,6 +12,9 @@ class Settings:
         self.app_dir = os.path.dirname(self.current_dir)
         self.project_root = os.path.dirname(self.app_dir)
         
+        # 보안 설정
+        self.secret_key = os.getenv("SECRET_KEY", "yidoweb-secret-key-2024-default-change-in-production")
+        
         # 디렉토리 경로들
         self.static_dir = os.getenv("STATIC_DIR", os.path.join(self.project_root, "static"))
         self.uploads_dir = os.getenv("UPLOADS_DIR", os.path.join(self.project_root, "uploads"))

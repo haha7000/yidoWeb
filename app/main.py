@@ -4,7 +4,7 @@ from app.core.config import settings
 from app.core.database import my_engine
 from app.models.models import Base
 from app.routers import auth, api, upload
-from app.routers import receipt, passport, history, fee, admin
+from app.routers import receipt, passport, history, fee, admin, result_management
 
 # FastAPI 앱 생성
 app = FastAPI(debug=True)
@@ -32,3 +32,4 @@ app.include_router(passport.router, tags=["여권"])
 app.include_router(history.router, tags=["이력관리"])
 app.include_router(fee.router, tags=["수수료"])
 app.include_router(admin.router, tags=["관리자"])
+app.include_router(result_management.router, tags=["결과관리"])

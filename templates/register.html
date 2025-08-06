@@ -315,40 +315,75 @@
             <form method="POST" action="/register/" id="registerForm">
                 <div class="form-group">
                     <label for="username" class="form-label">
-                        <i class="fas fa-user me-2"></i>아이디
+                        <i class="fas fa-user me-2"></i>아이디 <span class="text-danger">*</span>
                     </label>
                     <div class="input-group">
                         <input type="text" class="form-control" id="username" name="username" 
-                               placeholder="아이디를 입력하세요" required>
+                               placeholder="아이디를 입력하세요" required
+                               value="{{ username if username else '' }}"
+                               maxlength="50">
                         <i class="fas fa-user input-icon"></i>
+                        <button type="button" class="btn btn-sm btn-outline-primary" 
+                                id="checkUsernameBtn" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); z-index: 20;">
+                            중복확인
+                        </button>
                     </div>
+                    <div id="usernameCheckResult" class="mt-1"></div>
                 </div>
                 
                 <div class="form-group">
                     <label for="email" class="form-label">
-                        <i class="fas fa-envelope me-2"></i>이메일
+                        <i class="fas fa-envelope me-2"></i>이메일 <span class="text-danger">*</span>
                     </label>
                     <div class="input-group">
                         <input type="email" class="form-control" id="email" name="email" 
-                               placeholder="이메일을 입력하세요" required>
+                               placeholder="이메일을 입력하세요" required
+                               value="{{ email if email else '' }}">
                         <i class="fas fa-envelope input-icon"></i>
                     </div>
+                    <small class="text-muted">승인 후 로그인 정보가 이 이메일로 발송됩니다</small>
                 </div>
                 
                 <div class="form-group">
-                    <label for="password" class="form-label">
-                        <i class="fas fa-lock me-2"></i>비밀번호
+                    <label for="company_name" class="form-label">
+                        <i class="fas fa-building me-2"></i>회사명 <span class="text-danger">*</span>
                     </label>
                     <div class="input-group">
-                        <input type="password" class="form-control" id="password" name="password" 
-                               placeholder="비밀번호를 입력하세요" required>
-                        <i class="fas fa-lock input-icon"></i>
+                        <input type="text" class="form-control" id="company_name" name="company_name" 
+                               placeholder="회사명을 입력하세요" required
+                               value="{{ company_name if company_name else '' }}"
+                               maxlength="100">
+                        <i class="fas fa-building input-icon"></i>
+                    </div>
+                    <small class="text-muted">한 회사당 하나의 계정만 생성할 수 있습니다</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="position" class="form-label">
+                        <i class="fas fa-id-badge me-2"></i>직책 <span class="text-danger">*</span>
+                    </label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="position" name="position" 
+                               placeholder="직책을 입력하세요" required
+                               value="{{ position if position else '' }}"
+                               maxlength="50">
+                        <i class="fas fa-id-badge input-icon"></i>
                     </div>
                 </div>
                 
-                <button type="submit" class="btn-register" id="registerBtn">
+                <div class="alert alert-info" role="alert" style="margin: 20px 0; background: linear-gradient(135deg, #17a2b8, #138496); color: white;">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>승인 절차 안내</strong><br>
+                    <small>
+                        • 신청 후 관리자 검토를 거쳐 승인됩니다<br>
+                        • 승인 시 이메일로 로그인 정보를 안내드립니다<br>
+                        • 비밀번호는 자동으로 생성되어 발송됩니다
+                    </small>
+                </div>
+                
+                <button type="submit" class="btn-register" id="registerBtn" disabled>
                     <span class="btn-text">
-                        <i class="fas fa-user-plus me-2"></i>회원가입
+                        <i class="fas fa-paper-plane me-2"></i>신규가입 신청
                     </span>
                 </button>
             </form>
@@ -362,23 +397,112 @@
     </div>
 
     <script>
+        let isUsernameChecked = false;
+        let isUsernameAvailable = false;
+
+        // 아이디 중복체크 버튼 클릭
+        document.getElementById('checkUsernameBtn').addEventListener('click', function() {
+            const username = document.getElementById('username').value.trim();
+            const resultDiv = document.getElementById('usernameCheckResult');
+            const checkBtn = this;
+
+            if (!username) {
+                resultDiv.innerHTML = '<small class="text-danger"><i class="fas fa-exclamation-triangle"></i> 아이디를 입력해주세요</small>';
+                return;
+            }
+
+            if (username.length < 3) {
+                resultDiv.innerHTML = '<small class="text-danger"><i class="fas fa-exclamation-triangle"></i> 아이디는 3자 이상이어야 합니다</small>';
+                return;
+            }
+
+            // 로딩 상태
+            checkBtn.disabled = true;
+            checkBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            resultDiv.innerHTML = '<small class="text-muted"><i class="fas fa-spinner fa-spin"></i> 확인 중...</small>';
+
+            // 중복체크 API 호출
+            const formData = new FormData();
+            formData.append('username', username);
+
+            fetch('/check-username/', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                isUsernameChecked = true;
+                isUsernameAvailable = data.available;
+
+                if (data.available) {
+                    resultDiv.innerHTML = `<small class="text-success"><i class="fas fa-check-circle"></i> ${data.message}</small>`;
+                } else {
+                    resultDiv.innerHTML = `<small class="text-danger"><i class="fas fa-times-circle"></i> ${data.message}</small>`;
+                }
+                
+                checkFormValidity();
+            })
+            .catch(error => {
+                resultDiv.innerHTML = '<small class="text-danger"><i class="fas fa-exclamation-triangle"></i> 중복체크 중 오류가 발생했습니다</small>';
+                isUsernameChecked = false;
+                isUsernameAvailable = false;
+            })
+            .finally(() => {
+                checkBtn.disabled = false;
+                checkBtn.innerHTML = '중복확인';
+            });
+        });
+
+        // 아이디 입력 시 중복체크 상태 초기화
+        document.getElementById('username').addEventListener('input', function() {
+            isUsernameChecked = false;
+            isUsernameAvailable = false;
+            document.getElementById('usernameCheckResult').innerHTML = '';
+            checkFormValidity();
+        });
+
+        // 폼 유효성 검사
+        function checkFormValidity() {
+            const username = document.getElementById('username').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const companyName = document.getElementById('company_name').value.trim();
+            const position = document.getElementById('position').value.trim();
+            const registerBtn = document.getElementById('registerBtn');
+
+            const isValid = username && email && companyName && position && isUsernameChecked && isUsernameAvailable;
+            
+            registerBtn.disabled = !isValid;
+            registerBtn.style.opacity = isValid ? '1' : '0.6';
+        }
+
+        // 모든 필수 입력 필드에 이벤트 리스너 추가
+        ['username', 'email', 'company_name', 'position'].forEach(fieldId => {
+            document.getElementById(fieldId).addEventListener('input', checkFormValidity);
+        });
+
         // 회원가입 폼 제출 시 로딩 애니메이션
         document.getElementById('registerForm').addEventListener('submit', function(e) {
+            if (!isUsernameChecked || !isUsernameAvailable) {
+                e.preventDefault();
+                alert('아이디 중복확인을 먼저 해주세요.');
+                return;
+            }
+
             const registerBtn = document.getElementById('registerBtn');
             const btnText = registerBtn.querySelector('.btn-text');
             
             registerBtn.classList.add('loading');
-            btnText.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>처리 중...';
+            btnText.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>신청 처리 중...';
             registerBtn.disabled = true;
             
-            // 5초 후에도 응답이 없으면 원래 상태로 복구
+            // 10초 후에도 응답이 없으면 원래 상태로 복구
             setTimeout(() => {
                 if (registerBtn.classList.contains('loading')) {
                     registerBtn.classList.remove('loading');
-                    btnText.innerHTML = '<i class="fas fa-user-plus me-2"></i>회원가입';
-                    registerBtn.disabled = false;
+                    btnText.innerHTML = '<i class="fas fa-paper-plane me-2"></i>신규가입 신청';
+                    checkFormValidity();
                 }
-            }, 5000);
+            }, 10000);
         });
 
         // 입력 필드 포커스 애니메이션
@@ -393,15 +517,25 @@
             });
         });
 
-        // 키보드 단축키 (Enter)
+        // 키보드 단축키 비활성화 (실수 제출 방지)
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 const activeElement = document.activeElement;
                 if (activeElement.tagName === 'INPUT') {
                     e.preventDefault();
-                    document.getElementById('registerForm').submit();
+                    // Enter 키로는 제출하지 않고 다음 필드로 이동
+                    const inputs = Array.from(document.querySelectorAll('input'));
+                    const currentIndex = inputs.indexOf(activeElement);
+                    if (currentIndex < inputs.length - 1) {
+                        inputs[currentIndex + 1].focus();
+                    }
                 }
             }
+        });
+
+        // 페이지 로드 시 폼 유효성 검사
+        document.addEventListener('DOMContentLoaded', function() {
+            checkFormValidity();
         });
     </script>
 </body>
