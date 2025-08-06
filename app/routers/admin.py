@@ -243,14 +243,17 @@ async def deactivate_user(
     current_admin: User = Depends(get_admin_user),
     db: Session = Depends(get_db)
 ):
-    """사용자 탈퇴 처리"""
+    """사용자 비활성화"""
     try:
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             return JSONResponse(content={"success": False, "message": "사용자를 찾을 수 없습니다."})
         
         if user.is_admin:
-            return JSONResponse(content={"success": False, "message": "관리자 계정은 탈퇴시킬 수 없습니다."})
+            return JSONResponse(content={"success": False, "message": "관리자 계정은 비활성화시킬 수 없습니다."})
+        
+        if not user.is_active:
+            return JSONResponse(content={"success": False, "message": "이미 비활성화된 사용자입니다."})
         
         # 사용자 비활성화
         user.is_active = False
@@ -260,13 +263,75 @@ async def deactivate_user(
         
         return JSONResponse(content={
             "success": True, 
-            "message": f"{user.username} 사용자가 탈퇴 처리되었습니다."
+            "message": f"{user.username} 사용자가 비활성화되었습니다."
         })
         
     except Exception as e:
         db.rollback()
-        print(f"사용자 탈퇴 오류: {str(e)}")
-        return JSONResponse(content={"success": False, "message": f"탈퇴 처리 중 오류가 발생했습니다: {str(e)}"})
+        print(f"사용자 비활성화 오류: {str(e)}")
+        return JSONResponse(content={"success": False, "message": f"비활성화 처리 중 오류가 발생했습니다: {str(e)}"})
+
+@router.post("/admin/activate-user/")
+async def activate_user(
+    user_id: int = Form(...),
+    current_admin: User = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """사용자 활성화"""
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return JSONResponse(content={"success": False, "message": "사용자를 찾을 수 없습니다."})
+        
+        if user.is_active:
+            return JSONResponse(content={"success": False, "message": "이미 활성화된 사용자입니다."})
+        
+        # 사용자 활성화
+        user.is_active = True
+        user.status = "approved"  # 활성화 시 승인 상태로 변경
+        
+        db.commit()
+        
+        return JSONResponse(content={
+            "success": True, 
+            "message": f"{user.username} 사용자가 활성화되었습니다."
+        })
+        
+    except Exception as e:
+        db.rollback()
+        print(f"사용자 활성화 오류: {str(e)}")
+        return JSONResponse(content={"success": False, "message": f"활성화 처리 중 오류가 발생했습니다: {str(e)}"})
+
+@router.post("/admin/delete-user/")
+async def delete_user(
+    user_id: int = Form(...),
+    current_admin: User = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """사용자 완전 삭제 (탈퇴)"""
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return JSONResponse(content={"success": False, "message": "사용자를 찾을 수 없습니다."})
+        
+        if user.is_admin:
+            return JSONResponse(content={"success": False, "message": "관리자 계정은 삭제할 수 없습니다."})
+        
+        username = user.username
+        
+        # 데이터베이스에서 완전 삭제
+        db.delete(user)
+        db.commit()
+        
+        return JSONResponse(content={
+            "success": True, 
+            "message": f"{username} 사용자가 완전히 삭제되었습니다."
+        })
+        
+    except Exception as e:
+        db.rollback()
+        print(f"사용자 삭제 오류: {str(e)}")
+        return JSONResponse(content={"success": False, "message": f"삭제 처리 중 오류가 발생했습니다: {str(e)}"})
 
 @router.get("/admin/search-users/")
 async def search_users(
@@ -306,6 +371,7 @@ async def search_users(
                 "company_name": user.company_name,
                 "position": user.position,
                 "status": user.status,
+                "is_active": user.is_active,
                 "created_at": user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else "",
                 "last_login": user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else "로그인 기록 없음",
                 "approved_at": user.approved_at.strftime('%Y-%m-%d %H:%M') if user.approved_at else ""
