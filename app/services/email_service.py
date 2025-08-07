@@ -23,6 +23,15 @@ class EmailService:
         self.from_email = self.smtp_username
         self.admin_email = os.getenv("ADMIN_EMAIL", "ghehdch13@gmail.com")  # 관리자 이메일
     
+    def _get_base_url(self) -> str:
+        """기본 URL 반환 - 환경에 따라 동적으로 설정"""
+        # 환경변수에서 BASE_URL을 가져오고, 없으면 프로덕션 도메인 사용
+        base_url = os.getenv('BASE_URL')
+        if base_url:
+            return base_url.rstrip('/')  # 끝의 슬래시 제거
+        # 프로덕션 환경 기본값
+        return "https://yido.ydb2c.com"
+    
     def generate_random_password(self, length: int = 12) -> str:
         """랜덤 비밀번호 생성"""
         # 대소문자, 숫자, 특수문자 조합
@@ -88,6 +97,7 @@ class EmailService:
         """비밀번호 발송 이메일"""
         subject = "[YIDOWEB] 계정 승인 완료 - 로그인 정보 안내"
         
+        base_url = self._get_base_url()
         html_body = f"""
         <!DOCTYPE html>
         <html>
@@ -211,7 +221,7 @@ class EmailService:
                     </div>
                     
                     <div style="text-align: center;">
-                        <a href="http://localhost:8002/login/" class="button">
+                        <a href="{base_url}/login/" class="button">
                             🔓 지금 로그인하기
                         </a>
                     </div>
@@ -237,6 +247,7 @@ class EmailService:
         """관리자에게 신규 가입 알림 발송"""
         subject = "[YIDOWEB] 🔔 신규 가입 신청 알림"
         
+        base_url = self._get_base_url()
         html_body = f"""
         <!DOCTYPE html>
         <html>
@@ -350,7 +361,7 @@ class EmailService:
                     
                     <div style="text-align: center; margin: 30px 0;">
                         <p><strong>관리자 페이지에서 승인 또는 거절 처리를 해주세요.</strong></p>
-                        <a href="http://localhost:8002/admin/login" class="button">
+                        <a href="{base_url}/admin/login" class="button">
                             🔧 관리자 페이지로 이동
                         </a>
                     </div>
@@ -378,6 +389,7 @@ class EmailService:
         """가입 거절 알림 이메일"""
         subject = "[YIDOWEB] 가입 신청 결과 안내"
         
+        base_url = self._get_base_url()
         html_body = f"""
         <!DOCTYPE html>
         <html>
@@ -454,6 +466,7 @@ class EmailService:
         """아이디 찾기 결과 이메일"""
         subject = "[YIDOWEB] 아이디 찾기 결과"
         
+        base_url = self._get_base_url()
         html_body = f"""
         <!DOCTYPE html>
         <html>
@@ -577,7 +590,7 @@ class EmailService:
                     </div>
                     
                     <div style="text-align: center;">
-                        <a href="http://localhost:8002/login/" class="button">
+                        <a href="{base_url}/login/" class="button">
                             🔓 로그인하러 가기
                         </a>
                     </div>
@@ -603,7 +616,8 @@ class EmailService:
         """비밀번호 재설정 링크 이메일"""
         subject = "[YIDOWEB] 비밀번호 재설정 요청"
         
-        reset_url = f"http://localhost:8002/auth/reset-password?token={reset_token}"
+        base_url = self._get_base_url()
+        reset_url = f"{base_url}/auth/reset-password?token={reset_token}"
         
         html_body = f"""
         <!DOCTYPE html>

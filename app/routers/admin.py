@@ -119,9 +119,9 @@ async def admin_dashboard(
         # 신규 신청 사용자 조회
         pending_users = db.query(User).filter(User.status == "pending").order_by(User.created_at.desc()).all()
         
-        # 승인된 사용자 조회 (관리자 제외)
+        # 승인된 사용자 조회 (관리자 제외, 활성/비활성 모두 포함)
         approved_users = db.query(User).filter(
-            User.status == "approved",
+            User.status.in_(["approved", "deactivated"]),  # 승인됨 + 비활성화됨 모두 포함
             User.is_admin == False
         ).order_by(User.created_at.desc()).all()
         
@@ -320,7 +320,46 @@ async def delete_user(
         
         username = user.username
         
-        # 데이터베이스에서 완전 삭제
+        # 1. 관련된 데이터들의 user_id를 NULL로 설정 (이력 보존)
+        from app.models.models import (ProcessingHistory, ProcessingArchive, Receipt, 
+                                       Passport, ShillaReceipt, ReceiptMatchLog, MatchingHistory,
+                                       UnrecognizedImage, PassportArchive)
+        
+        # ProcessingHistory에서 user_id를 NULL로 설정 (이력 보존)
+        db.query(ProcessingHistory).filter(ProcessingHistory.user_id == user_id).update(
+            {"user_id": None}, synchronize_session=False
+        )
+        
+        # ProcessingArchive에서 user_id를 NULL로 설정 (이력 보존)
+        db.query(ProcessingArchive).filter(ProcessingArchive.user_id == user_id).update(
+            {"user_id": None}, synchronize_session=False
+        )
+        
+        # 2. 사용자와 직접 연결된 데이터들 삭제
+        # 순서가 중요 - 자식 테이블부터 삭제
+        
+        # MatchingHistory 삭제
+        db.query(MatchingHistory).filter(MatchingHistory.user_id == user_id).delete(synchronize_session=False)
+        
+        # ReceiptMatchLog 삭제
+        db.query(ReceiptMatchLog).filter(ReceiptMatchLog.user_id == user_id).delete(synchronize_session=False)
+        
+        # Receipt 삭제
+        db.query(Receipt).filter(Receipt.user_id == user_id).delete(synchronize_session=False)
+        
+        # Passport 삭제
+        db.query(Passport).filter(Passport.user_id == user_id).delete(synchronize_session=False)
+        
+        # ShillaReceipt 삭제
+        db.query(ShillaReceipt).filter(ShillaReceipt.user_id == user_id).delete(synchronize_session=False)
+        
+        # UnrecognizedImage 삭제
+        db.query(UnrecognizedImage).filter(UnrecognizedImage.user_id == user_id).delete(synchronize_session=False)
+        
+        # PassportArchive 삭제
+        db.query(PassportArchive).filter(PassportArchive.user_id == user_id).delete(synchronize_session=False)
+        
+        # 3. 사용자 삭제
         db.delete(user)
         db.commit()
         
@@ -348,7 +387,7 @@ async def search_users(
         if tab == "pending":
             query = query.filter(User.status == "pending")
         elif tab == "approved":
-            query = query.filter(User.status == "approved")
+            query = query.filter(User.status.in_(["approved", "deactivated"]))  # 활성/비활성 모두 포함
         
         if q:
             # 아이디, 이메일, 회사명, 직책으로 검색

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YIDOWEB 관리자 대시보드</title>
+    <title>관리자 대시보드</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -299,7 +299,7 @@
             <div class="d-flex justify-content-between align-items-center">
                 <div class="admin-logo">
                     <i class="fas fa-shield-alt"></i>
-                    YIDOWEB 관리자
+                    관리자 페이지
                 </div>
                 <div class="admin-user-info">
                     <div class="admin-avatar">
@@ -466,7 +466,12 @@
                                             {{ user.username[0].upper() }}
                                         </div>
                                         <div>
-                                            <div class="fw-bold">{{ user.username }}</div>
+                                            <div class="fw-bold">
+                                                {{ user.username }}
+                                                {% if not user.is_active %}
+                                                    <span class="badge bg-warning text-dark ms-2">비활성</span>
+                                                {% endif %}
+                                            </div>
                                             <div class="text-muted small">{{ user.email }}</div>
                                         </div>
                                     </div>
@@ -621,7 +626,10 @@
                                 <div class="d-flex align-items-center">
                                     <div class="user-avatar">${user.username[0].toUpperCase()}</div>
                                     <div>
-                                        <div class="fw-bold">${user.username}</div>
+                                        <div class="fw-bold">
+                                            ${user.username}
+                                            ${!user.is_active ? '<span class="badge bg-warning text-dark ms-2">비활성</span>' : ''}
+                                        </div>
                                         <div class="text-muted small">${user.email}</div>
                                     </div>
                                 </div>

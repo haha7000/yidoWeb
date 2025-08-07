@@ -221,7 +221,7 @@ class ProcessingArchive(Base):
     __tablename__ = "processing_archives"
     
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # 사용자 삭제 시 NULL 허용
     session_name = Column(String(200), nullable=False)
     archive_date = Column(TIMESTAMP, server_default=func.now())
     
@@ -269,7 +269,7 @@ class ProcessingHistory(Base):
     __tablename__ = "processing_history"
     
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # 사용자 삭제 시 NULL 허용
     upload_id = Column(String(50), nullable=False)  # 업로드 세션 ID
     session_name = Column(String(200), nullable=False)  # 사용자가 지정한 세션명
     

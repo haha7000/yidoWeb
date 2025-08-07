@@ -75,7 +75,7 @@ def create_admin_user():
         print("\n📋 관리자 계정 정보:")
         print("   아이디: yido782")
         print("   비밀번호: yido2020**")
-        print("   관리자 페이지: http://localhost:8000/admin/login")
+        print("   관리자 페이지: http://localhost:8000/admin/login (개발 환경)")
         
     except Exception as e:
         session.rollback()
@@ -95,7 +95,8 @@ if __name__ == "__main__":
         
         print("\n" + "=" * 60)
         print("🎉 관리자 계정 생성이 완료되었습니다!")
-        print("🌐 관리자 로그인: http://localhost:8000/admin/login")
+        print("🌐 관리자 로그인: http://localhost:8000/admin/login (개발 환경)")
+        print("🌐 프로덕션 환경에서는 도메인/admin/login 으로 접근하세요")
         print("=" * 60)
         
     except Exception as e:
