@@ -217,18 +217,31 @@ async def update_passport_by_id(
             # 매칭 성공 여부 확인
             is_matched = excel_result is not None
             
-            # 다음 매칭되지 않은 여권 찾기 (ID 기반)
-            unmatched_passports = get_unmatched_passports(current_user.id)
+            # SQL 쿼리로 다음 매칭되지 않은 여권 찾기 (ID 기준으로 효율적으로)
+            next_passport_sql = text("""
+                SELECT p.id, p.name as passport_name
+                FROM passports p
+                WHERE p.user_id = :user_id
+                AND p.is_matched = FALSE
+                AND p.id > :current_id
+                ORDER BY p.id
+                LIMIT 1
+            """)
+            next_result = db.execute(next_passport_sql, {"user_id": current_user.id, "current_id": passport_id}).fetchone()
             
-            # 현재 여권의 다음 여권 찾기 (ID 기반으로 비교)
+            # 디버깅을 위한 로그
+            print(f"🔍 다음 여권 찾기 - 현재 여권 ID: {passport_id}, 사용자 ID: {current_user.id}")
+            print(f"🔍 SQL 결과: {next_result}")
+            
             next_passport = None
-            current_found = False
-            for passport_item in unmatched_passports:
-                if current_found:
-                    next_passport = passport_item
-                    break
-                if passport_item.get('id') == passport_id:
-                    current_found = True
+            if next_result:
+                next_passport = {
+                    "id": next_result.id,
+                    "passport_name": next_result.passport_name
+                }
+                print(f"🔍 다음 여권 찾음: ID={next_result.id}, 이름={next_result.passport_name}")
+            else:
+                print("🔍 다음 여권이 없음")
             
             # JSON 응답으로 결과 반환
             return {
@@ -251,7 +264,6 @@ async def update_passport_by_id(
 
 @router.post("/update_passport/{name}")
 async def update_passport(
-    request: Request,
     name: str,
     new_name: str = Form(...),
     passport_number: str = Form(None),
@@ -340,10 +352,39 @@ async def update_passport(
             db.commit()
             print(f"여권 정보 업데이트 완료: {name} -> {new_name}")
             
-            # 다음 매칭되지 않은 여권 찾기
-            unmatched_passports = get_unmatched_passports(current_user.id)
+            # SQL 쿼리로 다음 매칭되지 않은 여권 찾기 (이름 기준)
+            next_passport_sql = text("""
+                WITH current_passport AS (
+                    SELECT id FROM passports WHERE name = :current_name AND user_id = :user_id
+                )
+                SELECT p.id, p.name as passport_name
+                FROM passports p, current_passport cp
+                WHERE p.user_id = :user_id
+                AND p.is_matched = FALSE
+                AND p.id > cp.id
+                ORDER BY p.id
+                LIMIT 1
+            """)
+            next_result = db.execute(next_passport_sql, {"user_id": current_user.id, "current_name": name}).fetchone()
             
-            # 현재 여권의 다음 여권 찾기
+            # 디버깅을 위한 로그
+            print(f"🔍 다음 여권 찾기 (이름 기반) - 현재 여권 이름: {name}, 사용자 ID: {current_user.id}")
+            print(f"🔍 SQL 결과: {next_result}")
+            
+            next_passport = None
+            if next_result:
+                next_passport = {
+                    "id": next_result.id,
+                    "passport_name": next_result.passport_name
+                }
+                print(f"🔍 다음 여권 찾음: ID={next_result.id}, 이름={next_result.passport_name}")
+            else:
+                print("🔍 다음 여권이 없음")
+            
+            # 매칭 성공 여부 확인
+            is_matched = excel_result is not None
+            
+            # 다음 매칭되지 않은 여권 찾기
             next_passport = None
             current_found = False
             for passport_item in unmatched_passports:
@@ -355,33 +396,21 @@ async def update_passport(
                 if passport_name == name:
                     current_found = True
             
-            # 다음 여권이 있으면 해당 여권 편집 페이지로, 없으면 목록 페이지로
-            if next_passport:
-                # next_passport도 딕셔너리 형태
-                next_name = next_passport.get('passport_name') if isinstance(next_passport, dict) else next_passport.name
-                return RedirectResponse(
-                    url=f"/edit_passport/{next_name}",
-                    status_code=303
-                )
-            else:
-                return RedirectResponse(
-                    url="/unmatched-passports/",
-                    status_code=303
-                )
+            # JSON 응답으로 결과 반환
+            return {
+                "success": True,
+                "matched": is_matched,
+                "message": "매칭 성공" if is_matched else "매칭 실패",
+                "next_passport": {
+                    "name": next_passport.get('passport_name') if next_passport else None
+                } if next_passport else None,
+                "has_more": next_passport is not None
+            }
             
         except Exception as e:
             db.rollback()
             print(f"update_passport 오류: {str(e)}")
-            return templates.TemplateResponse(
-                "edit_passport.html",
-                {
-                    "request": request,
-                    "passport": Passport(name=name, passport_number="", birthday=None, file_path=""),
-                    "name": name,
-                    "user": current_user,
-                    "error": f"여권 정보 업데이트 중 오류가 발생했습니다: {str(e)}"
-                }
-            )
+            raise HTTPException(status_code=500, detail=f"여권 정보 업데이트 중 오류가 발생했습니다: {str(e)}")
 
 @router.get("/unmatched-passports/")
 async def unmatched_passports(

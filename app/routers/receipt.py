@@ -277,19 +277,72 @@ async def update_unmatched(
                 except Exception as e:
                     print(f"할인율 수수료 자동 계산 중 오류: {e}")
             
-            # 다음 매칭되지 않은 영수증 찾기
+            # 다음 매칭되지 않은 영수증 찾기 (매칭 로그가 없거나 매칭되지 않은 것)
             unmatched_sql = text("""
-                SELECT r.id, r.receipt_number, r.file_path
+                SELECT DISTINCT r.id, r.receipt_number, r.file_path
                 FROM receipts r
-                JOIN receipt_match_log rml ON r.receipt_number = rml.receipt_number
-                WHERE rml.is_matched = FALSE 
-                AND r.user_id = :user_id 
-                AND rml.user_id = :user_id
-                AND r.id > :current_id
+                LEFT JOIN receipt_match_log rml ON r.receipt_number = rml.receipt_number 
+                    AND rml.user_id = r.user_id
+                WHERE r.user_id = :user_id 
+                AND r.id != :current_id
+                AND (rml.id IS NULL OR rml.is_matched = FALSE)
                 ORDER BY r.id
                 LIMIT 1
             """)
             next_receipt = db.execute(unmatched_sql, {"user_id": current_user.id, "current_id": receipt_id}).fetchone()
+            
+            # 디버깅을 위한 로그
+            print(f"🔍 [롯데] 다음 영수증 찾기 - 현재 영수증 ID: {receipt_id}, 사용자 ID: {current_user.id}")
+            print(f"🔍 [롯데] 매칭 결과: {is_matched}")
+            
+            # 더 자세한 디버깅을 위한 분석
+            # 1. 전체 영수증 수
+            total_receipts_sql = text("""
+                SELECT COUNT(DISTINCT r.id) as count
+                FROM receipts r
+                WHERE r.user_id = :user_id
+            """)
+            total_receipts = db.execute(total_receipts_sql, {"user_id": current_user.id}).scalar()
+            
+            # 2. 매칭 로그가 있는 영수증 수
+            logged_receipts_sql = text("""
+                SELECT COUNT(DISTINCT rml.receipt_number) as count
+                FROM receipt_match_log rml
+                WHERE rml.user_id = :user_id
+            """)
+            logged_receipts = db.execute(logged_receipts_sql, {"user_id": current_user.id}).scalar()
+            
+            # 3. 매칭된 영수증 수
+            matched_receipts_sql = text("""
+                SELECT COUNT(DISTINCT rml.receipt_number) as count
+                FROM receipt_match_log rml
+                WHERE rml.user_id = :user_id AND rml.is_matched = TRUE
+            """)
+            matched_receipts = db.execute(matched_receipts_sql, {"user_id": current_user.id}).scalar()
+            
+            # 4. 매칭되지 않은 영수증 수 (매칭 로그가 없거나 매칭되지 않은 것)
+            unmatched_receipts_sql = text("""
+                SELECT COUNT(DISTINCT r.id) as count
+                FROM receipts r
+                LEFT JOIN receipt_match_log rml ON r.receipt_number = rml.receipt_number 
+                    AND rml.user_id = r.user_id
+                WHERE r.user_id = :user_id
+                AND (rml.id IS NULL OR rml.is_matched = FALSE)
+            """)
+            unmatched_receipts = db.execute(unmatched_receipts_sql, {"user_id": current_user.id}).scalar()
+            
+            print(f"📊 [롯데] 영수증 현황:")
+            print(f"   - 전체 영수증: {total_receipts}개")
+            print(f"   - 매칭 로그가 있는 영수증: {logged_receipts}개") 
+            print(f"   - 매칭된 영수증: {matched_receipts}개")
+            print(f"   - 매칭되지 않은 영수증: {unmatched_receipts}개")
+            
+            print(f"🔍 [롯데] SQL 결과: {next_receipt}")
+            
+            if next_receipt:
+                print(f"🔍 [롯데] 다음 영수증 찾음: ID={next_receipt.id}, 영수증번호={next_receipt.receipt_number}")
+            else:
+                print("🔍 [롯데] 다음 영수증이 없음")
             
             # JSON 응답으로 결과 반환
             return {
@@ -478,18 +531,51 @@ async def update_unmatched(
             except Exception as e:
                 print(f"할인율 수수료 자동 계산 중 오류: {e}")
         
-        # 다음 매칭되지 않은 신라 영수증 찾기
+        # 다음 매칭되지 않은 신라 영수증 찾기 (현재 ID 제외하고 순서대로)
         next_unmatched_sql = text("""
             SELECT sr.id, sr.receipt_number, sr.file_path
             FROM shilla_receipts sr
             LEFT JOIN shilla_excel_data se ON sr.receipt_number = se."receiptNumber"::text
             WHERE sr.user_id = :user_id
             AND se."receiptNumber" IS NULL
-            AND sr.id > :current_id
+            AND sr.id != :current_id
             ORDER BY sr.id
             LIMIT 1
         """)
         next_receipt = db.execute(next_unmatched_sql, {"user_id": current_user.id, "current_id": receipt_id}).fetchone()
+        
+        # 디버깅을 위한 로그
+        print(f"🔍 [신라] 다음 영수증 찾기 - 현재 영수증 ID: {receipt_id}, 사용자 ID: {current_user.id}")
+        print(f"🔍 [신라] 매칭 결과: {is_matched}")
+        
+        # 신라 영수증 현황 확인
+        total_shilla_sql = text("SELECT COUNT(*) FROM shilla_receipts WHERE user_id = :user_id")
+        total_shilla = db.execute(total_shilla_sql, {"user_id": current_user.id}).scalar()
+        
+        matched_shilla_sql = text("""
+            SELECT COUNT(*) FROM shilla_receipts sr
+            JOIN shilla_excel_data se ON sr.receipt_number = se."receiptNumber"::text
+            WHERE sr.user_id = :user_id
+        """)
+        matched_shilla = db.execute(matched_shilla_sql, {"user_id": current_user.id}).scalar()
+        
+        unmatched_shilla_sql = text("""
+            SELECT COUNT(*) FROM shilla_receipts sr
+            LEFT JOIN shilla_excel_data se ON sr.receipt_number = se."receiptNumber"::text
+            WHERE sr.user_id = :user_id AND se."receiptNumber" IS NULL
+        """)
+        unmatched_shilla = db.execute(unmatched_shilla_sql, {"user_id": current_user.id}).scalar()
+        
+        print(f"📊 [신라] 영수증 현황:")
+        print(f"   - 전체 영수증: {total_shilla}개")
+        print(f"   - 매칭된 영수증: {matched_shilla}개")
+        print(f"   - 매칭되지 않은 영수증: {unmatched_shilla}개")
+        print(f"🔍 [신라] SQL 결과: {next_receipt}")
+        
+        if next_receipt:
+            print(f"🔍 [신라] 다음 영수증 찾음: ID={next_receipt.id}, 영수증번호={next_receipt.receipt_number}")
+        else:
+            print("🔍 [신라] 다음 영수증이 없음")
         
         # JSON 응답으로 결과 반환
         return {

@@ -30,7 +30,7 @@ class EmailService:
         if base_url:
             return base_url.rstrip('/')  # 끝의 슬래시 제거
         # 프로덕션 환경 기본값
-        return "https://yido.ydb2c.com"
+        return "http://yido.ydb2c.com"
     
     def generate_random_password(self, length: int = 12) -> str:
         """랜덤 비밀번호 생성"""

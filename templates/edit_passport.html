@@ -373,13 +373,19 @@ async function skipToNext() {
                 if (result.success) {
                     if (result.matched) {
                         // 매칭 성공 - 다음 이미지로 이동
-                        showSuccess('매칭 완료');
+                        showSuccess('매칭 성공');
                         
                         if (result.has_more && result.next_passport) {
                             setTimeout(() => {
-                                window.location.href = `/edit_passport_by_id/${result.next_passport.id}`;
+                                // ID 기반 또는 이름 기반으로 분기
+                                if (result.next_passport.id) {
+                                    window.location.href = `/edit_passport_by_id/${result.next_passport.id}`;
+                                } else if (result.next_passport.name) {
+                                    window.location.href = `/edit_passport/${encodeURIComponent(result.next_passport.name)}`;
+                                }
                             }, 1000);
                         } else {
+                            showSuccess('모든 여권 처리가 완료되었습니다!');
                             setTimeout(() => {
                                 window.location.href = '/unmatched-passports/';
                             }, 2000);
@@ -540,3 +546,7 @@ async function changeItemType(newType) {
 }
 </style>
 {% endblock %}
+
+
+
+
