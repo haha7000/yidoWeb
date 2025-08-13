@@ -114,6 +114,9 @@ class LotteExporter:
             
             df = df.rename(columns=existing_mappings)
             
+            # 데이터 타입 변환 (DB 스키마에 맞춰)
+            df = self._convert_data_types(df)
+            
             # 변경된 컬럼 정보 출력
             if existing_mappings:
                 print(f"\n🔄 컬럼명 변경:")
@@ -148,6 +151,70 @@ class LotteExporter:
             print(f"   시도한 경로: {file_path}")
             return None
     
+    def _convert_data_types(self, df):
+        """DB 스키마에 맞는 데이터 타입으로 변환"""
+        print("\n🔄 데이터 타입 변환 중...")
+        
+        # DB의 text 컬럼들
+        text_cols = [
+            "점구분", "원매출일자", "매출일자", "수입/로컬", "단체번호", "name", "VIP번호", "receiptNumber",
+            "교환권상태", "카테고리", "브랜드", "상품명", "상품구분", "상품코드", "Ref.No", "Color", 
+            "배송구분", "판매방식"
+        ]
+
+        # DB의 numeric 컬럼들
+        numeric_cols = [
+            "판매수량", "판매가($)", "총매출액($)", "순매출액($)", "할인액($)",
+            "총매출액(\\)", "순매출액(\\)", "할인액(\\)"
+        ]
+        
+        conversion_count = 0
+        
+        # Text 컬럼 변환
+        for col in text_cols:
+            if col in df.columns:
+                # 기존 타입 확인
+                original_dtype = df[col].dtype
+                
+                # 문자열로 변환 (None/NaN은 빈 문자열로)
+                df[col] = df[col].astype(str).replace(['nan', 'None', 'NaN'], '')
+                
+                print(f"   📝 {col}: {original_dtype} → text")
+                conversion_count += 1
+        
+        # Numeric 컬럼 변환
+        for col in numeric_cols:
+            if col in df.columns:
+                # 기존 타입 확인
+                original_dtype = df[col].dtype
+                
+                try:
+                    # 문자열이나 다른 타입을 numeric으로 변환
+                    # 먼저 문자열로 변환하고 불필요한 문자 제거
+                    df[col] = df[col].astype(str).str.replace(',', '').str.replace('$', '').str.replace('\\', '')
+                    
+                    # 빈 문자열이나 'nan'을 0으로 변환
+                    df[col] = df[col].replace(['', 'nan', 'None', 'NaN'], '0')
+                    
+                    # numeric 타입으로 변환 (errors='coerce'로 변환 실패시 NaN)
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                    
+                    # NaN을 0으로 대체
+                    df[col] = df[col].fillna(0)
+                    
+                    print(f"   🔢 {col}: {original_dtype} → numeric")
+                    conversion_count += 1
+                    
+                except Exception as e:
+                    print(f"   ⚠️ {col} 변환 실패: {e}, 원래 타입 유지")
+        
+        if conversion_count > 0:
+            print(f"✅ 총 {conversion_count}개 컬럼 타입 변환 완료")
+        else:
+            print("ℹ️ 변환할 컬럼이 없습니다.")
+        
+        return df
+    
     def _is_korean_column(self, column_name):
         """컬럼명이 한글인지 확인"""
         import re
@@ -171,6 +238,25 @@ class LotteExporter:
         """통계 정보 출력"""
         print(f"\n📊 데이터 통계:")
         print(f"   총 데이터 건수: {len(df)}건")
+        
+        # 데이터 타입별 컬럼 수 확인
+        text_count = 0
+        numeric_count = 0
+        other_count = 0
+        
+        for col in df.columns:
+            dtype = str(df[col].dtype)
+            if dtype in ['object', 'string']:
+                text_count += 1
+            elif 'int' in dtype or 'float' in dtype:
+                numeric_count += 1
+            else:
+                other_count += 1
+        
+        print(f"   📝 Text 컬럼: {text_count}개")
+        print(f"   🔢 Numeric 컬럼: {numeric_count}개")
+        if other_count > 0:
+            print(f"   ❓ 기타 컬럼: {other_count}개")
         
         # 지점별 데이터 개수
         if '점구분' in df.columns and '지점코드' in df.columns:

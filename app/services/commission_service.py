@@ -159,12 +159,13 @@ class CommissionService:
             logger.warning(f"면세점명을 찾을 수 없습니다: duty_free_type={duty_free_type}, store_branch={store_branch}")
             return None
         
-        # fee_settings에서 해당 면세점, 지점, 날짜에 맞는 설정 조회
+        # fee_settings에서 해당 사용자의 면세점, 지점, 날짜에 맞는 설정 조회
         # 최근 업로드된 설정을 우선으로 조회 (created_at DESC)
         settings_query = """
         SELECT id, free_rate_threshold 
         FROM fee_settings 
-        WHERE company_name = :company_name
+        WHERE user_id = :user_id
+        AND company_name = :company_name
         AND branch_name = :branch_name
         AND :sales_date BETWEEN effective_from AND COALESCE(effective_to, '2099-12-31')
         ORDER BY created_at DESC, effective_from DESC
@@ -172,6 +173,7 @@ class CommissionService:
         """
         
         settings_result = self.session.execute(text(settings_query), {
+            "user_id": user_id,
             "company_name": company_name,
             "branch_name": store_branch,
             "sales_date": sales_date

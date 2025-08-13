@@ -36,7 +36,7 @@ async def get_uploaded_fees(current_user: User = Depends(get_current_user)):
                 creator_id,
                 note
             FROM fee_settings 
-            WHERE creator_id = :user_id
+            WHERE user_id = :user_id
             ORDER BY created_at DESC
             """
             
@@ -90,7 +90,7 @@ async def delete_uploaded_fees(
                 # 1. fee_settings 확인 및 권한 체크
                 check_query = """
                 SELECT id FROM fee_settings 
-                WHERE id = :fee_id AND creator_id = :user_id
+                WHERE id = :fee_id AND user_id = :user_id
                 """
                 
                 result = db.execute(text(check_query), {
@@ -155,7 +155,7 @@ async def get_fee_setting_detail(
                 creator_id,
                 note
             FROM fee_settings 
-            WHERE id = :settings_id AND creator_id = :user_id
+            WHERE id = :settings_id AND user_id = :user_id
             """
             
             settings_result = db.execute(text(settings_query), {
@@ -290,7 +290,7 @@ async def update_fee_settings(
             # 1. 권한 확인
             check_query = """
             SELECT id FROM fee_settings 
-            WHERE id = :settings_id AND creator_id = :user_id
+            WHERE id = :settings_id AND user_id = :user_id
             """
             
             result = db.execute(text(check_query), {

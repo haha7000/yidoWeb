@@ -983,6 +983,7 @@ async function searchFeeData() {
         // API 파라미터 구성
         const params = new URLSearchParams();
         params.append('query_date', date);
+        params.append('user_id', getCurrentUserId());  // 현재 사용자 ID 추가
         if (store) params.append('company_name', store === 'lotte' ? 'LOTTE' : store === 'shilla' ? 'SHILLA' : 'HYUNDAI');
         if (branch) {
             const branchMap = {

@@ -276,8 +276,8 @@ async def upload_processed_excel(file_path):
             
             # 로그인 시도
             login_data = {
-                "username": "haha",
-                "password": "haha"
+                "username": "yidoyido",
+                "password": "yidoyido"
             }
             
             print("🔐 웹사이트 로그인 시도...")

@@ -310,6 +310,7 @@ class FeeSettings(Base):
     __tablename__ = "fee_settings"
     
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # 수수료 설정 소유자
     company_name = Column(String(50), nullable=False)  # 면세점명 (LOTTE, SHILLA)
     branch_name = Column(String(100), nullable=False)  # 지점명
     note = Column(Text, nullable=True)  # 메모
@@ -322,6 +323,7 @@ class FeeSettings(Base):
     updater_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     
     # 관계 설정
+    user = relationship("User", foreign_keys=[user_id])  # 소유자 관계
     creator = relationship("User", foreign_keys=[creator_id])
     updater = relationship("User", foreign_keys=[updater_id])
     category_fees = relationship("CategoryFees", back_populates="settings")
