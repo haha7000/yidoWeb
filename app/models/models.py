@@ -44,6 +44,11 @@ class User(Base):
     archives = relationship("ProcessingArchive", back_populates="user")
     processing_histories = relationship("ProcessingHistory", back_populates="user")
     
+    # 새로 추가된 관계들
+    lotte_excel_data = relationship("LotteExcelData")
+    shilla_excel_data = relationship("ShillaExcelData")
+    duty_free_accounts = relationship("DutyFreeAccount")
+    
     # 승인자 관계 (자기 참조)
     approver = relationship("User", remote_side=[id], backref="approved_users")
     
@@ -418,6 +423,8 @@ class LotteExcelData(Base):
     
     # Primary Key (SERIAL)
     id = Column(Integer, primary_key=True, autoincrement=True)
+    # 사용자 ID (새로 추가)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # 실제 DB 스키마에 맞는 컬럼들 (text 타입)
     점구분 = Column(Text, nullable=True)
@@ -450,5 +457,80 @@ class LotteExcelData(Base):
     할인액_원 = Column(DECIMAL(15,2), nullable=True, name='할인액(\)')
     
     def __repr__(self):
-        return f"<LotteExcelData(name={self.name}, receiptNumber={self.receiptNumber}, 상품명={self.상품명})>"
+        return f"<LotteExcelData(user_id={self.user_id}, name={self.name}, receiptNumber={self.receiptNumber}, 상품명={self.상품명})>"
+
+class ShillaExcelData(Base):
+    """신라 면세점 엑셀 데이터"""
+    __tablename__ = "shilla_excel_data"
+    
+    # Primary Key (SERIAL)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    # 사용자 ID
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    # 신라 면세점 엑셀 컬럼들 (text 타입)
+    No = Column(Text, nullable=True)
+    점 = Column(Text, nullable=True)
+    원매출일자 = Column(Text, nullable=True)
+    매출일자 = Column(Text, nullable=True)
+    여행사명 = Column(Text, nullable=True)
+    여행사코드 = Column(Text, nullable=True)
+    그룹번호 = Column(Text, nullable=True)
+    대표가이드 = Column(Text, nullable=True)
+    출생연도 = Column(Text, nullable=True)
+    name = Column(Text, nullable=True)  # 고객명
+    receiptNumber = Column(Text, nullable=True)  # BILL 번호
+    BILL_상태 = Column(Text, nullable=True, name='BILL 상태')
+    상품위치 = Column(Text, nullable=True)
+    카테고리 = Column(Text, nullable=True)
+    브랜드명 = Column(Text, nullable=True)
+    상품명 = Column(Text, nullable=True)
+    상품코드 = Column(Text, nullable=True)
+    
+    # 신라 면세점 엑셀 컬럼들 (numeric 타입)
+    판매가_달러 = Column(DECIMAL(15,2), nullable=True, name='판매가($)')
+    순매출액_원 = Column(DECIMAL(15,2), nullable=True, name='순매출액(￦)')
+    할인액_원 = Column(DECIMAL(15,2), nullable=True, name='할인액(￦)')
+    
+    def __repr__(self):
+        return f"<ShillaExcelData(user_id={self.user_id}, name={self.name}, receiptNumber={self.receiptNumber}, 상품명={self.상품명})>"
+
+class DutyFreeAccount(Base):
+    """면세점 계정 정보"""
+    __tablename__ = "duty_free_accounts"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    duty_free_type = Column(String(20), nullable=False)  # 'lotte' or 'shilla'
+    username = Column(String(100), nullable=False)  # 면세점 계정 ID
+    password = Column(String(100), nullable=False)  # 면세점 계정 PW (평문)
+    is_active = Column(Boolean, default=True)  # 활성화 여부
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, nullable=True)
+    
+    # 관계 설정
+    user = relationship("User")
+    automation_logs = relationship("AutomationLog", back_populates="account")
+    
+    def __repr__(self):
+        return f"<DutyFreeAccount(user_id={self.user_id}, type={self.duty_free_type}, username={self.username})>"
+
+class AutomationLog(Base):
+    """자동화 실행 로그"""
+    __tablename__ = "automation_logs"
+    
+    id = Column(Integer, primary_key=True)
+    account_id = Column(Integer, ForeignKey("duty_free_accounts.id"), nullable=False)
+    duty_free_type = Column(String(20), nullable=False)  # 'lotte' or 'shilla'
+    status = Column(String(20), nullable=False)  # 'success', 'failed', 'running'
+    message = Column(Text, nullable=True)  # 성공/실패 메시지
+    records_count = Column(Integer, nullable=True)  # 처리된 레코드 수
+    started_at = Column(TIMESTAMP, server_default=func.now())
+    completed_at = Column(TIMESTAMP, nullable=True)
+    
+    # 관계 설정
+    account = relationship("DutyFreeAccount", back_populates="automation_logs")
+    
+    def __repr__(self):
+        return f"<AutomationLog(account_id={self.account_id}, status={self.status}, records={self.records_count})>"
 

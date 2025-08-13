@@ -207,7 +207,13 @@ class ExcelProcessor:
     def save_processed_excel(self, df):
         """처리된 Excel 파일 저장"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.processed_file_path = f"/Users/ec2-user/Downloads/shilla_report_processed_{timestamp}.xlsx"
+        # 동적으로 사용자 홈 디렉터리 가져오기
+        import os
+        import getpass
+        current_user = getpass.getuser()
+        downloads_dir = os.path.expanduser(f"~{current_user}/Downloads")
+        os.makedirs(downloads_dir, exist_ok=True)  # 디렉터리 생성
+        self.processed_file_path = f"{downloads_dir}/shilla_report_processed_{timestamp}.xlsx"
         
         try:
             df.to_excel(self.processed_file_path, index=False, engine='openpyxl')
@@ -467,7 +473,11 @@ async def process_and_upload_excel(excel_file_path):
 async def main():
     """메인 실행 함수 (기존 호환성 유지)"""
     # 원본 Excel 파일 경로
-    original_file = '/Users/ec2-user/Downloads/shilla_report.xlsx'
+    # 동적으로 사용자 홈 디렉터리에서 파일 찾기
+    import getpass
+    current_user = getpass.getuser()
+    downloads_dir = os.path.expanduser(f"~{current_user}/Downloads")
+    original_file = f'{downloads_dir}/shilla_report.xlsx'
     
     # 통합 함수 호출
     success = await process_and_upload_excel(original_file)

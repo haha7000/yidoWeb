@@ -43,7 +43,7 @@ def matchingResult(user_id):
         WHERE user_id = :user_id 
           AND receipt_number IS NOT NULL
     ) unique_receipts
-    LEFT JOIN lotte_excel_data e ON unique_receipts.receipt_number = e."receiptNumber"
+    LEFT JOIN lotte_excel_data e ON unique_receipts.receipt_number = e."receiptNumber" AND e.user_id = :user_id
     LEFT JOIN passports p ON e.name = p.name AND p.user_id = :user_id
     GROUP BY unique_receipts.receipt_number
     ORDER BY unique_receipts.receipt_number

@@ -196,11 +196,71 @@ async def main():
 
             page.on("download", on_download)
 
-            # 다운로드 버튼 클릭
-            await page.click('xpath=/html/body/sc-mdi/div/div[2]/div[3]/sc-mdi-content/div/iron-pages/sc-mdi-window[2]/div/em-guide-sale/div/es-guide-sale-list/sc-toolbar/sc-button[2]')
+            # 다운로드 버튼 클릭 (재시도 로직 포함)
+            max_retries = 3
+            download_button_xpath = 'xpath=/html/body/sc-mdi/div/div[2]/div[3]/sc-mdi-content/div/iron-pages/sc-mdi-window[2]/div/em-guide-sale/div/es-guide-sale-list/sc-toolbar/sc-button[2]'
+            
+            for attempt in range(max_retries):
+                try:
+                    print(f"다운로드 버튼 클릭 시도 {attempt + 1}/{max_retries}")
+                    await page.click(download_button_xpath)
+                    print("✅ 다운로드 버튼 클릭 성공!")
+                    break
+                except Exception as click_error:
+                    print(f"다운로드 버튼 클릭 실패 (시도 {attempt + 1}): {click_error}")
+                    
+                    if attempt < max_retries - 1:
+                        print("2초 대기 후 재시도...")
+                        await page.wait_for_timeout(2000)
+                        
+                        # 팝업이나 다른 요소가 방해하는 경우를 위한 추가 처리
+                        try:
+                            # 일반적인 팝업 요소들 확인 및 닫기
+                            popup_selectors = [
+                                'button:has-text("확인")',
+                                'button:has-text("OK")', 
+                                'button:has-text("닫기")',
+                                'button:has-text("취소")',
+                                '[class*="popup"] button',
+                                '[class*="modal"] button',
+                                '[class*="dialog"] button',
+                                '.ui-dialog-titlebar-close',
+                                '[data-dismiss="modal"]'
+                            ]
+                            
+                            for selector in popup_selectors:
+                                try:
+                                    popup_element = await page.query_selector(selector)
+                                    if popup_element:
+                                        await popup_element.click()
+                                        print(f"팝업 닫기 성공: {selector}")
+                                        await page.wait_for_timeout(500)
+                                        break
+                                except:
+                                    continue
+                            
+                            # ESC 키로 팝업 닫기 시도
+                            await page.keyboard.press('Escape')
+                            print("ESC 키로 팝업 닫기 시도")
+                            await page.wait_for_timeout(1000)
+                            
+                        except Exception as popup_error:
+                            print(f"팝업 처리 중 오류: {popup_error}")
+                            pass
+                        
+                        # 페이지 새로고침이나 다른 방해 요소 제거 시도
+                        try:
+                            # 다운로드 버튼이 다시 보이는지 확인
+                            await page.wait_for_selector(download_button_xpath.replace('xpath=', ''), timeout=5000)
+                            print("다운로드 버튼 재확인 완료")
+                        except:
+                            print("다운로드 버튼 재확인 실패, 계속 진행")
+                    else:
+                        print("❌ 모든 다운로드 버튼 클릭 시도 실패")
+                        raise Exception("다운로드 버튼 클릭 최종 실패")
 
         except Exception as e:
-            print(f"엑셀 다운로드 버튼 클릭 실패: {e}")
+            print(f"엑셀 다운로드 버튼 클릭 최종 실패: {e}")
 
         # 다운로드 완료까지 대기
         print("다운로드 및 업로드 완료 대기 중... (최대 60초)")
@@ -209,5 +269,6 @@ async def main():
         print("✅ 작업 완료! 브라우저를 종료합니다.")
         await browser.close()
 
-# 실행
-asyncio.run(main())
+# 실행 (스크립트로 직접 실행될 때만)
+if __name__ == "__main__":
+    asyncio.run(main())

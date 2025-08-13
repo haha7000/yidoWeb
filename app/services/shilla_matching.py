@@ -17,7 +17,7 @@ def shilla_matching_result(user_id):
         
         # 데이터 현황 확인
         receipt_count = session.execute(text("SELECT COUNT(*) FROM shilla_receipts WHERE user_id = :user_id"), {"user_id": user_id}).scalar()
-        excel_count = session.execute(text("SELECT COUNT(*) FROM shilla_excel_data")).scalar()
+        excel_count = session.execute(text("SELECT COUNT(*) FROM shilla_excel_data WHERE user_id = :user_id"), {"user_id": user_id}).scalar()
         passport_count = session.execute(text("SELECT COUNT(*) FROM passports WHERE user_id = :user_id"), {"user_id": user_id}).scalar()
         log_count = session.execute(text("SELECT COUNT(*) FROM receipt_match_log WHERE user_id = :user_id AND duty_free_type = 'shilla'"), {"user_id": user_id}).scalar()
         
@@ -38,6 +38,7 @@ def shilla_matching_result(user_id):
         FROM shilla_excel_data se
         WHERE p.passport_number = se.passport_number
         AND p.user_id = :user_id
+        AND se.user_id = :user_id
         AND se.passport_number IS NOT NULL
         AND se.passport_number != ''
         AND p.passport_number IS NOT NULL
@@ -68,6 +69,7 @@ def shilla_matching_result(user_id):
         FROM shilla_receipts sr
         WHERE REPLACE(se."receiptNumber"::text, '.0', '') = sr.receipt_number
         AND sr.user_id = :user_id
+        AND se.user_id = :user_id
         AND sr.passport_number IS NOT NULL
         AND sr.passport_number != ''
         AND (se.passport_number IS NULL OR se.passport_number = '')
@@ -102,7 +104,7 @@ def shilla_matching_result(user_id):
                      ELSE 0 END) as total_net_sales_krw,
             MIN(se."점") as store_branch
         FROM shilla_receipts sr
-        LEFT JOIN shilla_excel_data se ON REPLACE(se."receiptNumber"::text, '.0', '') = sr.receipt_number
+        LEFT JOIN shilla_excel_data se ON REPLACE(se."receiptNumber"::text, '.0', '') = sr.receipt_number AND se.user_id = :user_id
         LEFT JOIN passports p
           ON (p.passport_number = sr.passport_number OR p.passport_number = se.passport_number)
           AND p.user_id = :user_id
@@ -322,7 +324,7 @@ def fetch_shilla_results(user_id):
             END as passport_status,
             COALESCE(p.name, se.name) as order_name
         FROM shilla_receipts sr
-        JOIN shilla_excel_data se ON REPLACE(se."receiptNumber"::text, '.0', '') = sr.receipt_number
+        JOIN shilla_excel_data se ON REPLACE(se."receiptNumber"::text, '.0', '') = sr.receipt_number AND se.user_id = :user_id
         LEFT JOIN passports p ON (sr.passport_number = p.passport_number OR se.passport_number = p.passport_number) 
                                AND p.user_id = :user_id
         WHERE sr.user_id = :user_id
@@ -334,7 +336,7 @@ def fetch_shilla_results(user_id):
         unmatched_sql = """
         SELECT DISTINCT sr.*
         FROM shilla_receipts sr
-        LEFT JOIN shilla_excel_data se ON REPLACE(se."receiptNumber"::text, '.0', '') = sr.receipt_number
+        LEFT JOIN shilla_excel_data se ON REPLACE(se."receiptNumber"::text, '.0', '') = sr.receipt_number AND se.user_id = :user_id
         WHERE se."receiptNumber" IS NULL AND sr.user_id = :user_id
         """
         unmatched = db.execute(text(unmatched_sql), {"user_id": user_id}).fetchall()
@@ -420,7 +422,7 @@ def get_shilla_unmatched_passports(user_id):
                 ELSE 'excel_not_matched'
             END as excel_match_status
         FROM passports p
-        LEFT JOIN shilla_excel_data se ON p.passport_number = se.passport_number
+        LEFT JOIN shilla_excel_data se ON p.passport_number = se.passport_number AND se.user_id = :user_id
         LEFT JOIN shilla_receipts sr ON p.passport_number = sr.passport_number AND sr.user_id = :user_id
         WHERE p.user_id = :user_id
         AND (
@@ -532,7 +534,7 @@ def fetch_shilla_results_with_details(user_id):
             -- 매칭 상태 추가
             COALESCE(rml.is_matched, FALSE) as is_matched
         FROM shilla_receipts sr
-        LEFT JOIN shilla_excel_data se ON REPLACE(se."receiptNumber"::text, '.0', '') = sr.receipt_number
+        LEFT JOIN shilla_excel_data se ON REPLACE(se."receiptNumber"::text, '.0', '') = sr.receipt_number AND se.user_id = :user_id
         LEFT JOIN receipt_match_log rml ON rml.receipt_number = sr.receipt_number 
                                         AND rml.user_id = :user_id
                                         AND rml.duty_free_type = 'shilla'
